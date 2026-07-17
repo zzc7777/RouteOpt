@@ -6,6 +6,8 @@
  */
 
 #include "solver.hpp"
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 
@@ -123,7 +125,7 @@ namespace RouteOpt {
     }
 
     int Solver::setEnvFeasibilityTol(double value, bool if_model_free){
-      return CPXsetdblparam(env, CPXPARAM_EpRHS, value);
+      return CPXsetdblparam(env, CPXPARAM_Simplex_Tolerances_Feasibility, value);
       }
 
     int Solver::setEnvIntFeasTol(double value, bool if_model_free) {
@@ -489,11 +491,11 @@ namespace RouteOpt {
         return CPXchgbds(env, model, 1, &col, "U", &value);
     }
 
-    int Solver::getColLower(int col, double* value) {
+    int Solver::getColLower(int col, double* value) const {
         return CPXgetlb(env, model, value, col, col);
     }
 
-    int Solver::getColUpper(int col, double* value) {
+    int Solver::getColUpper(int col, double* value) const {
         return CPXgetub(env, model, value, col, col);
     }
 

@@ -19,7 +19,9 @@
 #include <cstdlib>
 
 namespace RouteOpt {
+#ifndef SOLVER_TYPE
 #define SOLVER_TYPE 0
+#endif
 
 #define SAFE_SOLVER(call) {                                      \
 int solver_err = (call);                                         \

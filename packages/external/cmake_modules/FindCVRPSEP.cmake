@@ -18,6 +18,9 @@ find_library(CVRPSEP_LIBRARY
         NAMES cvrpsep libcvrpsep
         PATHS
         "${CVRPSEP_ROOT}/obj"
+        "${CVRPSEP_ROOT}/obj/Release"
+        "${CVRPSEP_ROOT}/obj/RelWithDebInfo"
+        "${CVRPSEP_ROOT}/obj/Debug"
         "${CVRPSEP_ROOT}/build"
         "${CVRPSEP_ROOT}/build/Release"
         "${CVRPSEP_ROOT}/build/RelWithDebInfo"

@@ -23,3 +23,10 @@
 /packages/external/**/*.dll
 /packages/external/**/*.lib
 /packages/external/**/*.d
+
+# Local dependency sources and application build outputs
+/packages/external/xgb/
+/packages/application/cvrp/build/
+/packages/application/cvrp/bin/
+/packages/application/cvrp/lib/hgs/build/
+/packages/application/cvrp/lib/hgs/lib/
