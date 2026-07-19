@@ -10,7 +10,29 @@
         "LABEL_ASSIGN_OVERRIDE": "80000"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.mergeConfigurations": true,
     "C_Cpp.default.compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/packages/application/cvrp/src/**",
+        "${workspaceFolder}/packages/application/cvrp/lib/hgs/include",
+        "${workspaceFolder}/packages/branching/**",
+        "${workspaceFolder}/packages/common/**",
+        "${workspaceFolder}/packages/rounded_cap_cuts/**",
+        "${workspaceFolder}/packages/rank1_cuts/**",
+        "${workspaceFolder}/packages/deluxing/**",
+        "${workspaceFolder}/packages/external/boost",
+        "${workspaceFolder}/packages/external/eigen",
+        "${workspaceFolder}/packages/external/cvrpsep",
+        "${workspaceFolder}/packages/external/xgb/include",
+        "D:/Applications/Development Tools/CPLEX_Studio221/cplex/include",
+        "D:/Applications/anaconda3/Library/include"
+    ],
+    "C_Cpp.default.defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "SOLVER_TYPE=1",
+        "LABEL_ASSIGN_OVERRIDE=80000"
+    ],
     "C_Cpp.default.cppStandard": "c++20",
     "C_Cpp.default.intelliSenseMode": "windows-msvc-x64"
 }
