@@ -1,0 +1,16 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}/packages/application/cvrp",
+    "cmake.buildDirectory": "${workspaceFolder}/packages/application/cvrp/build",
+    "cmake.generator": "Visual Studio 17 2022",
+    "cmake.configureOnOpen": true,
+    "cmake.configureSettings": {
+        "ROUTEOPT_SOLVER": "CPLEX",
+        "CPLEX_ROOT": "D:/Applications/Development Tools/CPLEX_Studio221/cplex",
+        "ZLIB_ROOT": "D:/Applications/anaconda3/Library",
+        "LABEL_ASSIGN_OVERRIDE": "80000"
+    },
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe",
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.intelliSenseMode": "windows-msvc-x64"
+}
