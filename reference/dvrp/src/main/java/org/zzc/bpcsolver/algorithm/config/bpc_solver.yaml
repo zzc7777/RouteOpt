@@ -1,0 +1,97 @@
+name: "BPC_Solver_Config"
+version: "2.0"
+
+# Logging
+logging:
+  LOGGING_SWITCH: "off"
+  OUTPUT_DIR: "D://Workplace/Java/benchmark/logs"
+  ## OUTPUT_DIR: "H://PhDJavaCode/Benchmarks/logs"
+
+  FILE_NAME_PATTERN: "{instance}_{date}_{time}.yaml"
+  components:
+    PRIMAL_HEURISTIC: true
+    COLUMN_GENERATION: true
+    PRICING: false
+    CUTTING: true
+    RELAXATION: true
+    VARIABLE_FIXING: true
+    SCHEDULE_ENUMERATION: true
+    DIVING: true
+    BRANCHING: true
+    SOLUTION: true
+
+# Algorithm Setting
+## Relaxation
+relaxation:
+  RELAXATION_SWITCH: "none"
+  NG_SIZE: 4
+  MAX_NG_SIZE: 10
+
+## Stabilization
+stabilization:
+  STABILIZATION_SWITCH: "none"
+  ALPHA: 0.6
+  ADJUST_STEP_SIZE: 0.2
+
+## Diving
+diving:
+  DIVING_SWITCH: "none"
+
+## Primal Heuristic
+primalHeuristic:
+  PRIMAL_HEURISTIC_SWITCH: "column-pool-integer-master"
+
+## Column Generation
+columnGeneration:
+  COLUMN_GENERATION_SWITCH: "column generation"
+  NUM_ADDED_COLUMN: 8
+  MAX_NUM_COLUMN: 10000
+  PARALLEL_PRICING: true
+
+## Cutting
+cutting:
+  CUTTING_SWITCH: "none"
+  NUM_ADDED_CUT: 0
+  MAX_NUM_CUT: 0
+  BASE_SET_SIZE: 3
+  MULTIPLIER: 0.5
+  # lmSRC/R1C guards from the literature: stop further separation when pricing becomes too slow
+  # or the last trailing rounds do not reduce the gap enough. Only active when CUTTING_SWITCH is lm-src.
+  STOP_AFTER_PRICING_SECONDS: 6.0
+  TRAILING_ROUNDS: 3
+  MIN_TRAILING_GAP_IMPROVEMENT: 0.02
+
+## Branching
+branching:
+  BRANCHING_SWITCH: "branch-and-bound"
+  BRANCH_VARIABLE: "qij"
+  VARIABLE_SELECTION_RULE: "most fractional branching"
+  NODE_SELECTION_RULE: "best-first selection"
+  NUM_CANDIDATE_VARIABLES_1: 10
+  NUM_CANDIDATE_VARIABLES_2: 4
+
+## Pricing
+pricing:
+  PRICING_SWITCH: "forward labeling"
+  HEURISTIC_PRICING: "none"
+  DIMENSIONS: 1
+  NUM_BUCKETS_1: 20
+  NUM_BUCKETS_2: 10
+  THRESHOLD_BIDIRECTIONAL_SEARCH: 0.5
+
+## Variable Fixing
+variableFixing:
+  VARIABLE_FIXING_SWITCH: "none"
+  THRESHOLD_VARIABLE_FIXING: 20
+
+## Schedule Enumeration
+scheduleEnumeration:
+  SCHEDULE_ENUMERATION_SWITCH: "none"
+  THRESHOLD_SCHEDULE_ENUMERATION: 10
+  SCHEDULE_POOL_SIZE: 20000
+
+## Result Recording
+resultRecording:
+  RECORD_RESULTS: true
+  RESULTS_DIR: "results"
+  RUN_DESCRIPTION: ""
