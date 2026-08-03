@@ -11,7 +11,7 @@
 #include "route_opt_macro.hpp"
 
 namespace RouteOpt::Application::CVRP {
-    constexpr double TIME_LIMIT{std::numeric_limits<float>::max()};
+    constexpr double TIME_LIMIT{3600};
 
     enum class APPLICATION_TYPE {
         CVRP,
@@ -32,7 +32,7 @@ namespace RouteOpt::Application::CVRP {
         ML_USE_MODEL
     };
 
-    constexpr APPLICATION_TYPE app_type{APPLICATION_TYPE::CVRP};
+    constexpr APPLICATION_TYPE app_type{APPLICATION_TYPE::VRPTW};
     constexpr VRPTW_TYPE vrptw_type{VRPTW_TYPE::SINGLE_RESOURCE};
     constexpr ML_TYPE ml_type{ML_TYPE::ML_USE_MODEL};
 
@@ -96,7 +96,7 @@ namespace RouteOpt::Application::CVRP {
                                                       ? 1
                                                       : 2;
 
-    constexpr int NODE_MEMORY_ROUTE_LENGTH{20};
+    constexpr int NODE_MEMORY_ROUTE_LENGTH{30};
 
     enum class NUM_TESTING {
         PHASE0 = 30,

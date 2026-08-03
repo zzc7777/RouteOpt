@@ -20,4 +20,4 @@ make -j"${JOBS}"
 
 cd ..
 
-./bin/cvrp instance/P-n20-k2.vrp -u 217
+./bin/cvrp instance/vrptw/solomon-100/c101.txt
