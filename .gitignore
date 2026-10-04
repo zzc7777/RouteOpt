@@ -25,6 +25,7 @@
 /packages/external/**/*.d
 
 # Local dependency sources and application build outputs
+/build/
 /packages/external/xgb/
 /packages/application/cvrp/build/
 /packages/application/cvrp/bin/
