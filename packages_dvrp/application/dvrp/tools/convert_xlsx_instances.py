@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=repository_root / "packages/application/dvrp/instance",
+        default=repository_root / "packages_dvrp/application/dvrp/instance",
     )
     parser.add_argument("--exclude", action="append", default=[], metavar="STEM")
     return parser.parse_args()

@@ -14,6 +14,9 @@
     "C_Cpp.default.compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe",
     "C_Cpp.default.includePath": [
         "${workspaceFolder}/packages/application/cvrp/src/**",
+        "${workspaceFolder}/packages_dvrp/application/dvrp/src",
+        "${workspaceFolder}/packages_dvrp/application/dvrp/src/read_data/include",
+        "${workspaceFolder}/packages_dvrp/common/config",
         "${workspaceFolder}/packages/application/cvrp/lib/hgs/include",
         "${workspaceFolder}/packages/branching/**",
         "${workspaceFolder}/packages/common/**",

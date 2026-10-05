@@ -1,10 +1,10 @@
 # DVRP 数据读取模块实现说明
 
-> 状态：已实现。
+> 状态：已完成。
 >
-> 代码提交：`3102d11 feat(dvrp): add first-stage instance reader`。
+> 初版代码提交：`3102d11 feat(dvrp): add first-stage instance reader`。
 >
-> 最近验证：2026-10-04，CTest 9/9 通过。
+> 最后更新及最近验证：2026-10-05，迁移到 `packages_dvrp` 后 Release 构建及 CTest 9/9 通过。
 
 ## 1. 模块作用
 
@@ -16,16 +16,17 @@
 
 | 文件 | 实际职责 |
 | --- | --- |
-| `packages/application/dvrp/CMakeLists.txt` | 建立独立 `dvrp` 和 `dvrp_read_data_test` 目标 |
-| `packages/application/dvrp/src/main.cpp` | CLI、帮助信息、读取摘要和退出码 |
-| `packages/application/dvrp/src/read_data/include/read_data_controller.hpp` | reader 类接口和外部引用成员 |
-| `packages/application/dvrp/src/read_data/src/read_data.cpp` | 文件读取、Solomon 段解析和严格校验 |
-| `packages/application/dvrp/tools/convert_xlsx_instances.py` | 将 Java Excel 数据转换为八字段 TXT |
-| `packages/application/dvrp/test/read_data_test.cpp` | 字段检查和 434 个实例批量读取测试 |
-| `packages/application/dvrp/test/fixtures/` | 最小合法输入和错误输入样例 |
-| `packages/application/dvrp/instance/` | 转换后的 DVRP TXT 实例 |
+| `packages_dvrp/application/dvrp/CMakeLists.txt` | 建立独立 `dvrp` 和 `dvrp_read_data_test` 目标 |
+| `packages_dvrp/application/dvrp/src/main.cpp` | CLI、帮助信息、读取摘要和退出码 |
+| `packages_dvrp/application/dvrp/src/read_data/include/read_data_controller.hpp` | reader 类接口和外部引用成员 |
+| `packages_dvrp/application/dvrp/src/read_data/src/read_data.cpp` | 文件读取、Solomon 段解析和严格校验 |
+| `packages_dvrp/application/dvrp/tools/convert_xlsx_instances.py` | 将 Java Excel 数据转换为八字段 TXT |
+| `packages_dvrp/application/dvrp/test/read_data_test.cpp` | 字段检查和 434 个实例批量读取测试 |
+| `packages_dvrp/application/dvrp/test/fixtures/` | 最小合法输入和错误输入样例 |
+| `packages_dvrp/application/dvrp/instance/` | 转换后的 DVRP TXT 实例 |
+| `packages_dvrp/common/config/route_opt_macro.hpp` | 从原版复制的配置头文件，提供节点上限和错误机制；保留原内容及许可证 |
 
-模块使用 C++20，当前不链接 CPLEX、Gurobi、HGS、cuts 或 pricing。
+模块使用 C++20，编译源文件和配置头文件均来自 `packages_dvrp`，当前不链接 CPLEX、Gurobi、HGS、cuts 或 pricing。原 `packages` 中的静态求解模块保持不变；DVRP reader、CLI 和测试逻辑未因迁移改变。
 
 ## 3. 调用流程
 
@@ -123,14 +124,16 @@ CUST NO.  XCOORD.  YCOORD.  DEMAND  READY TIME  DUE DATE  SERVICE TIME  DISCLOSU
 配置和构建：
 
 ```powershell
-cmake -S packages/application/dvrp -B build/dvrp -DCMAKE_BUILD_TYPE=Release
+cmake -S packages_dvrp/application/dvrp -B build/dvrp -DCMAKE_BUILD_TYPE=Release
 cmake --build build/dvrp --config Release -j 8
 ```
+
+若已有 `build/dvrp` 缓存仍指向迁移前的源码目录，首次配置使用 `cmake --fresh -S packages_dvrp/application/dvrp -B build/dvrp -DCMAKE_BUILD_TYPE=Release` 重建缓存；不要移动旧缓存或手工改生成的项目文件。本次 Windows 验证使用 Visual Studio 17 2022、x64。
 
 运行：
 
 ```powershell
-.\build\dvrp\Release\dvrp.exe .\packages\application\dvrp\instance\c101_D_25_E_25.txt
+.\build\dvrp\Release\dvrp.exe .\packages_dvrp\application\dvrp\instance\c101_D_25_E_25.txt
 ```
 
 支持的形式：
@@ -150,7 +153,7 @@ cmake --build build/dvrp --config Release -j 8
 - 默认排除 `c101_D_25_E_25_1` 和 `c101_D_25_E_25_2`；
 - 当前输出目录包含 434 个 TXT。
 
-转换工具是数据准备脚本，不会在 `dvrp.exe` 运行时自动执行。
+转换工具是数据准备脚本，不会在 `dvrp.exe` 运行时自动执行。默认输出为 `packages_dvrp/application/dvrp/instance`；Excel 来源仍在 `reference/dvrp`，静态模板仍取自原 `packages/application/cvrp/instance/vrptw/solomon-100`，不会修改这些源数据。
 
 ## 8. 验证结果
 
@@ -160,7 +163,7 @@ cmake --build build/dvrp --config Release -j 8
 ctest --test-dir build/dvrp -C Release --output-on-failure
 ```
 
-2026-10-04 的结果：
+2026-10-05 迁移后重新构建与测试的结果：
 
 - 9/9 个 CTest 通过；
 - 全部 434 个 TXT 均成功读取；

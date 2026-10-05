@@ -31,3 +31,7 @@
 /packages/application/cvrp/bin/
 /packages/application/cvrp/lib/hgs/build/
 /packages/application/cvrp/lib/hgs/lib/
+
+# Independent DVRP application build outputs
+/packages_dvrp/application/dvrp/build/
+/packages_dvrp/application/dvrp/bin/
