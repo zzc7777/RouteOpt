@@ -16,6 +16,7 @@
         "${workspaceFolder}/packages/application/cvrp/src/**",
         "${workspaceFolder}/packages_dvrp/application/dvrp/src",
         "${workspaceFolder}/packages_dvrp/application/dvrp/src/read_data/include",
+        "${workspaceFolder}/packages_dvrp/application/dvrp/src/dynamic/include",
         "${workspaceFolder}/packages_dvrp/common/config",
         "${workspaceFolder}/packages/application/cvrp/lib/hgs/include",
         "${workspaceFolder}/packages/branching/**",

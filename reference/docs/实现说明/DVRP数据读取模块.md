@@ -175,6 +175,8 @@ ctest --test-dir build/dvrp -C Release --output-on-failure
 
 ## 9. 当前限制
 
+动态状态与事件推进现已在[独立模块](DVRP动态状态与事件推进模块.md)实现；以下仍是 reader 自身的职责边界，CLI 当前仍只读取。
+
 该模块目前只完成数据读取，不包含：
 
 - 动态事件和车辆状态推进；

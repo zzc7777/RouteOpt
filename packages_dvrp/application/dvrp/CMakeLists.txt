@@ -13,14 +13,18 @@ include(CTest)
 set(DVRP_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/read_data/include")
 set(ROUTEOPT_CONFIG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../common/config")
 set(DVRP_READER_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/read_data/src/read_data.cpp")
+set(DVRP_DYNAMIC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/dynamic/include")
+set(DVRP_DYNAMIC_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/dynamic/src/dynamic_controller.cpp")
 
 add_executable(dvrp
     src/main.cpp
     ${DVRP_READER_SOURCE}
+    ${DVRP_DYNAMIC_SOURCE}
 )
 
 target_include_directories(dvrp PRIVATE
     ${DVRP_INCLUDE_DIR}
+    ${DVRP_DYNAMIC_INCLUDE_DIR}
     ${ROUTEOPT_CONFIG_INCLUDE_DIR}
 )
 
@@ -35,6 +39,16 @@ target_include_directories(dvrp_read_data_test PRIVATE
 )
 
 if (BUILD_TESTING)
+    add_executable(dvrp_dynamic_test test/dynamic_test.cpp ${DVRP_DYNAMIC_SOURCE} ${DVRP_READER_SOURCE})
+    target_include_directories(dvrp_dynamic_test PRIVATE
+        ${DVRP_DYNAMIC_INCLUDE_DIR} ${DVRP_INCLUDE_DIR} ${ROUTEOPT_CONFIG_INCLUDE_DIR})
+    foreach (case events commitment return distance validation time stop external loaded
+            external_deadline empty arithmetic stop_later partition input)
+        add_test(NAME dvrp_dynamic_${case} COMMAND dvrp_dynamic_test ${case})
+    endforeach ()
+    add_test(NAME dvrp_dynamic_reader COMMAND dvrp_dynamic_test reader
+        "${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/minimal_valid.txt")
+
     add_test(
         NAME dvrp_read_data_test
         COMMAND dvrp_read_data_test
