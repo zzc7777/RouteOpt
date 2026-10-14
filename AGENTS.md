@@ -1,6 +1,6 @@
 # RouteOpt DVRP 开发约定（v4 对齐版）
 
-> 最后更新：2026-10-06
+> 最后更新：2026-10-14
 
 > 本文件是 `dvrp` 分支的项目上下文，记录当前代码事实、模型语义、参考实现和待确认边界。除非另有说明，本文中的路径均相对于仓库根目录。
 >
@@ -28,7 +28,7 @@
 
 DVRP 采用与原版平行的 `packages_dvrp/` 源码树；原 `packages/` 保留静态 CVRP/VRPTW。后续以复制原模块再适配的方式复用实现，即使代码相同也维护 DVRP 自己的副本，不默认直接依赖原版源码或共享其全局状态。任何需要支持多起点的修改，都必须证明不会破坏单车场 CVRP/VRPTW。
 
-已确认的目录边界：DVRP 入口为 `packages_dvrp/application/dvrp/`，其余模块在 `packages_dvrp/branching`、`common`、`external` 等同级目录中管理，不再逐个追加 `_dvrp`。本次只迁移已经实现的 reader、实例和测试，并复制其必需的 `common/config/route_opt_macro.hpp`；其余目录为空，不代表算法已适配。后续按模块复制时保留来源及许可证，分别配置构建，避免两个源码树的同名头文件和实现混用。
+已确认的目录边界：DVRP 入口为 `packages_dvrp/application/dvrp/`，其余模块在 `packages_dvrp/branching`、`common`、`external` 等同级目录中管理，不再逐个追加 `_dvrp`。最初迁移 reader、实例和测试及其必需的 `common/config/route_opt_macro.hpp`；随后新增动态模块，并为小实例对照复制 `common/solver_interface` 的 CPLEX 必需接口和 `external/cmake_modules/FindCPLEX.cmake`。其余算法目录尚未适配，不能把目录存在理解为算法可用。后续按模块复制时保留来源及许可证，分别配置构建，避免两个源码树的同名头文件和实现混用。
 
 ## DVRP 输入格式方向
 
@@ -222,7 +222,9 @@ DVRPSimulationController 事件循环、实际距离累计、阶段结果输出
 
 ## Harness / 测试要求
 
-当前动态模块已在 `packages_dvrp/application/dvrp/src/dynamic` 实现，采用三个生产文件，接口见总体设计 3.5 节和实现说明。25项 CTest 包含原 reader 9项和动态16项，动态测试由手工路线驱动，不接 BP、不改变 reader CLI；真实求解超时机制在下游接入时实现。
+小实例完整集合划分对照工具已实现：先完整枚举 elementary 路线，再以 CPLEX 求 LP/MIP；仅在 `packages_dvrp/application/dvrp/test/stage_reference/` 提供测试入口，每阶段最多5客户/5外部起点，不改变 reader CLI。必需 solver 接口复制到 DVRP 的 `common/solver_interface`。`DVRP_BUILD_REFERENCE_SOLVER` 默认OFF；开启后新增15项测试，Release/Debug均40/40通过，关闭后保留原25项。细节及限制见 `reference/docs/实现说明/DVRP小实例集合划分对照求解器.md`。该工具不包含生产 BP、ng、分支或统一图方案，不表示这些选择已获批准。
+
+当前动态模块已在 `packages_dvrp/application/dvrp/src/dynamic` 实现，采用三个生产文件，接口见总体设计 3.5 节和实现说明。基础25项 CTest包含原 reader 9项和手工路线动态16项；新对照工具另验证MIP自动驱动三阶段、最终实际距离28，不是BP闭环。对照接口已设置真实CPLEX时限；本机零秒冒烟仍返回最优，超时有/无解映射及停止由确定性测试覆盖，不宣称已触发真实超时。生产BP与CLI自动求解仍待接入。
 
 每次修改都应让行为可以被小实例和日志复现。优先建立以下测试层次：
 
@@ -236,6 +238,8 @@ DVRPSimulationController 事件循环、实际距离累计、阶段结果输出
 建议每个阶段输出可机器读取的记录，至少包括：`currentTime`、下一事件时间、剩余客户、外部起点、各路线起点和序列、阶段目标、实际行驶距离、求解状态及耗时。这样才能定位“状态更新错误”和“阶段求解慢”是两类不同问题。
 
 ## 当前待确认边界
+
+2026-10-14 多起点 RMP 已按用户授权完成：生产文件位于 `packages_dvrp/application/dvrp/src/node`，每行一个人工变量、两阶段 LP、初始列、增量加列及有效 dual。原需求已合并至 `reference/docs/实现说明/DVRP多起点RMP模块.md` 和独立方法导读，稳定接口保留在 `reference/docs/设计/M1-标准BP-DVRP/02-多起点RMP文件与接口.md`。新增16项测试，两项solver开关均开启时Release/Debug均56/56通过，均关闭时25/25通过。RMP没有5客户限制，但未验证大实例BP性能。本轮没有接入生产pricing、RF、搜索树或CLI求解，唯一下一步是确认pricing需求与接口。RF基线、ng和统一图仍是后续待确认选择。
 
 在这些问题确认前，不要把临时选择写成不可逆的全局约定：
 

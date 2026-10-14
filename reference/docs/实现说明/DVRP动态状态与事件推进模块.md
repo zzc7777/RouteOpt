@@ -2,7 +2,7 @@
 
 > 状态：已完成（动态模块；不包含阶段 BP）。
 >
-> 最后更新：2026-10-06。
+> 最后更新：2026-10-14（更新下游RMP入口；动态代码及原验证记录不变）。
 >
 > 语义依据：[数学模型 v4](../模型和推导/DVRP%20数学模型-v4.md)。
 
@@ -10,7 +10,7 @@
 
 ## 1. 当前能做什么
 
-接收 reader 的八字段数据，生成动态事件和 `StageProblem`；接收手工或未来求解器给出的整数路线，校验后推进车辆，累计实际距离，直到下一事件或全部返场。
+接收 reader 的八字段数据，生成动态事件和 `StageProblem`；接收手工、已实现的小实例对照或未来BP给出的整数路线，校验后推进车辆，累计实际距离，直到下一事件或全部返场。
 
 `dvrp.exe` 的 CLI 仍只读取实例。动态模块已编入该目标，但尚未在 `main.cpp` 接入自动求解；目前通过 `dvrp_dynamic_test` 独立运行。不能据此声称已经完成 DVRP 的 BP 求解。
 
@@ -24,7 +24,7 @@
 | `src/dynamic/include/dynamic_controller.hpp` | 动态控制器接口与私有执行计划 |
 | `src/dynamic/src/dynamic_controller.cpp` | 事件、时间轨迹、状态投影、结果校验和距离结算 |
 | `test/dynamic_test.cpp` | 手工路线验收、60组事件分割检查及 reader 集成 |
-| `CMakeLists.txt` | 编译动态源文件，注册动态测试；不链接 solver |
+| `CMakeLists.txt` | 编译动态源文件，注册动态测试；该动态测试目标不链接 solver，可选阶段对照目标另行链接 |
 
 原版 `packages/`、DVRP reader 与输入格式未改变。距离函数从原 VRPTW 初始化逻辑适配，保留来源与 GPL-3.0 标注。
 
@@ -34,7 +34,7 @@
 reader 的 info_vertex、capacity、instanceName
   -> DynamicController（复制输入，拥有实际状态和执行计划）
   -> StageProblem（当前客户、各起点、独立返回车场、固定成本）
-  -> 手工路线 / 未来阶段求解器
+  -> 手工路线 / 小实例MIP对照 / 未来阶段BP
   -> StageSolution（阶段编号、状态、每条路线的起点和客户顺序）
   -> 校验并接续执行 -> 下一事件
 ```
@@ -86,7 +86,7 @@ reader 的 info_vertex、capacity、instanceName
 
 `Infeasible`、两种 `TimeLimit` 和 `Error` 都停止仿真；超时即使有可行路线也不执行，不沿用旧计划、不报告成功。`records()` 保存当时阶段、收到的状态/路线和原因；失败记录的成本未验证，以 `executed=false` 区分。
 
-记录目前保存在内存，调用方可取值；没有磁盘恢复、自动 JSON 导出或真实 solver 计时中止机制，后者留到阶段求解器接入时实现。
+记录目前保存在内存，调用方可取值；没有磁盘恢复或自动 JSON 导出。动态模块本身不管理 solver 计时；已完成的可选对照工具负责向CPLEX传时限，生产BP的时限联动仍待接入。
 
 ## 8. 构建与测试
 
@@ -126,4 +126,4 @@ Java 旧实现的途中改道、返场复用、仅累计完整弧距离与 v4 �
 
 ## 9. 下游边界
 
-下一模块是小实例的阶段枚举对照求解器，输入 `StageProblem`，输出 `StageSolution`，之后再接多起点 RMP/pricing/BP。当前不包含 solver、最优性证明、自动求解 CLI 或大实例性能优化。
+[小实例集合划分对照求解器](DVRP小实例集合划分对照求解器.md)已完成，通过相同 `StageProblem` / `StageSolution` 接口在测试中自动连跑MIP阶段，并由本模块重验路线。[多起点RMP](DVRP多起点RMP模块.md)也已实现，但尚未接入生产pricing/BP；动态生产代码没有因此修改。下一步确认pricing接口；当前 `dvrp.exe` 仍不提供自动求解CLI，也未做大实例性能优化。
