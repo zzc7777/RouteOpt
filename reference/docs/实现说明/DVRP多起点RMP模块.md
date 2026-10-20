@@ -2,7 +2,7 @@
 
 > 状态：已完成（根 RMP 能力，不是完整列生成或 BP）
 >
-> 最后更新：2026-10-14
+> 最后更新：2026-10-15
 >
 > 详细执行顺序见[流程与方法导读](DVRP多起点RMP流程与方法导读.md)；稳定边界见[文件与接口](../设计/M1-标准BP-DVRP/02-多起点RMP文件与接口.md)。
 
@@ -15,10 +15,10 @@
   → DVRP_RmpController(stage)
   → addInitialRoutes / addRoutes
   → solveLp → Phase-I 人工量 / Phase-II 成本 / dual
-  → 未来 pricing 返回新路线，再 addRoutes
+  → pricing 返回新路线，再 addRoutes（目前由测试驱动）
 ```
 
-当前最后一条反馈在测试中由扫描枚举全集模拟，没有生产标签算法。`dvrp.exe` 仍只读取实例，RMP 不输出可执行的 `StageSolution`。
+原rmp_test.cpp用枚举扫描模拟最后一条反馈；后续已完成的[双版本定价](DVRP多起点定价模块.md)另在pricing_rmp_test.cpp使用真实标签算法供列，并与完整LP对照。尚无生产根列生成控制器。`dvrp.exe` 仍只读取实例，RMP 不输出可执行的 `StageSolution`。
 
 ## 2. 文件与所有权
 
@@ -102,7 +102,7 @@ ctest --test-dir build/dvrp-rmp -C Debug --output-on-failure
 
 ## 7. 限制及下一步
 
-没有生产 pricing、ng、RF、树、cuts、列删除、子节点复制或重新开启 Phase-I。下一步先确定 pricing 需求及文件接口，再接根节点列生成。当前生产能力不受5客户限制，但没有真实大实例 BP 性能结论。
+没有生产根列生成控制器、ng、RF、树、cuts、列删除、子节点复制或重新开启Phase-I。双版本pricing已实现并完成测试接线，下一步确定正式根列生成的需求及接口。当前生产能力不受5客户限制，但没有真实大实例BP性能结论。
 
 尚未实际触发 RMP 运行超时、增量写入中途 API 失败或数值失效；映射和失败处理有代码路径，不能冒充这些故障均已实测。重复创建不是专用泄漏检测；未验证 Gurobi/Linux/macOS。
 

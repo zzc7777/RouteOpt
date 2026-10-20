@@ -12,6 +12,14 @@ include(CTest)
 
 option(DVRP_BUILD_REFERENCE_SOLVER "Build the small complete-route CPLEX LP/MIP test tool" OFF)
 option(DVRP_BUILD_RMP_TESTS "Build the multi-start RMP tests (CPLEX)" OFF)
+option(DVRP_BUILD_PRICING_TESTS "Build plain/bucket pricing tests (solver optional)" OFF)
+
+set(DVRP_PRICING_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/pricing")
+set(DVRP_PRICING_SOURCES
+    ${DVRP_PRICING_DIR}/src/pricing_controller.cpp
+    ${DVRP_PRICING_DIR}/src/labeling_plain.cpp
+    ${DVRP_PRICING_DIR}/src/bucket_graph.cpp
+    ${DVRP_PRICING_DIR}/src/labeling_bucket.cpp)
 
 set(DVRP_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/read_data/include")
 set(ROUTEOPT_CONFIG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../common/config")
@@ -87,6 +95,36 @@ if (BUILD_TESTING)
     set_tests_properties(dvrp_cli_missing_argument PROPERTIES WILL_FAIL TRUE)
 endif ()
 
+if (DVRP_BUILD_PRICING_TESTS)
+    if (NOT BUILD_TESTING)
+        message(FATAL_ERROR "DVRP pricing tests require BUILD_TESTING=ON")
+    endif ()
+    add_executable(dvrp_pricing_test test/pricing/pricing_test.cpp ${DVRP_PRICING_SOURCES}
+        test/stage_reference/stage_route_enumerator.cpp ${DVRP_DYNAMIC_SOURCE})
+    target_include_directories(dvrp_pricing_test PRIVATE
+        ${DVRP_PRICING_DIR}/include src/node/include test/stage_reference
+        ${DVRP_DYNAMIC_INCLUDE_DIR} ${ROUTEOPT_CONFIG_INCLUDE_DIR})
+    if (MSVC)
+        target_compile_options(dvrp_pricing_test PRIVATE /utf-8)
+    endif ()
+    foreach (case hand resources nonmetric empty zero random validation limits lifecycle size graph dominance boundary dense)
+        add_test(NAME dvrp_pricing_${case} COMMAND dvrp_pricing_test ${case})
+        set_tests_properties(dvrp_pricing_${case} PROPERTIES TIMEOUT 120)
+    endforeach ()
+    add_executable(dvrp_pricing_property_test test/pricing/pricing_property_test.cpp
+        ${DVRP_PRICING_SOURCES} ${DVRP_DYNAMIC_SOURCE})
+    target_include_directories(dvrp_pricing_property_test PRIVATE
+        ${DVRP_PRICING_DIR}/include src/node/include
+        ${DVRP_DYNAMIC_INCLUDE_DIR} ${ROUTEOPT_CONFIG_INCLUDE_DIR})
+    if (MSVC)
+        target_compile_options(dvrp_pricing_property_test PRIVATE /utf-8)
+    endif ()
+    foreach (case fuzz_17 fuzz_4217 fuzz_8391 fuzz_20261015 seven metamorphic numeric limits bitset)
+        add_test(NAME dvrp_pricing_property_${case} COMMAND dvrp_pricing_property_test ${case})
+        set_tests_properties(dvrp_pricing_property_${case} PROPERTIES TIMEOUT 300)
+    endforeach ()
+endif ()
+
 if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS)
     if (NOT BUILD_TESTING)
         message(FATAL_ERROR "DVRP solver tests require BUILD_TESTING=ON")
@@ -157,5 +195,48 @@ if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS)
             add_test(NAME dvrp_rmp_${case} COMMAND dvrp_rmp_test ${case})
             set_tests_properties(dvrp_rmp_${case} PROPERTIES TIMEOUT 120)
         endforeach ()
+        if (DVRP_BUILD_PRICING_TESTS)
+            add_executable(dvrp_pricing_rmp_test test/pricing/pricing_rmp_test.cpp
+                ${DVRP_PRICING_SOURCES} src/node/src/rmp_controller.cpp
+                ${DVRP_REFERENCE_DIR}/stage_route_enumerator.cpp
+                ${DVRP_REFERENCE_DIR}/stage_reference_solver.cpp
+                ${DVRP_SOLVER_DIR}/src/solver_cplex.cpp ${DVRP_DYNAMIC_SOURCE})
+            target_include_directories(dvrp_pricing_rmp_test PRIVATE ${DVRP_PRICING_DIR}/include src/node/include)
+            configure_dvrp_solver_test(dvrp_pricing_rmp_test)
+            foreach (case basic initial infeasible fractional random empty interrupted stress)
+                add_test(NAME dvrp_pricing_rmp_${case} COMMAND dvrp_pricing_rmp_test ${case})
+                set_tests_properties(dvrp_pricing_rmp_${case} PROPERTIES TIMEOUT 120)
+            endforeach ()
+            # Real-instance pricing probe: deliberately no route enumerator linked.
+            add_executable(dvrp_pricing_instance_test test/pricing/pricing_instance_test.cpp
+                ${DVRP_PRICING_SOURCES} src/node/src/rmp_controller.cpp
+                ${DVRP_SOLVER_DIR}/src/solver_cplex.cpp ${DVRP_DYNAMIC_SOURCE} ${DVRP_READER_SOURCE})
+            target_include_directories(dvrp_pricing_instance_test PRIVATE
+                ${DVRP_PRICING_DIR}/include src/node/include ${DVRP_INCLUDE_DIR})
+            configure_dvrp_solver_test(dvrp_pricing_instance_test)
+            add_test(NAME dvrp_pricing_instance_smoke COMMAND dvrp_pricing_instance_test
+                "${CMAKE_CURRENT_SOURCE_DIR}/instance/c101_D_25_E_25.txt" 2)
+            set_tests_properties(dvrp_pricing_instance_smoke PROPERTIES TIMEOUT 90)
+
+            # Independent single-path MIP oracle, isolated under test/. Neither label
+            # backend calls it. Enumeration is invoked ONLY by the <=5-customer tests.
+            add_executable(dvrp_pricing_mip_test
+                test/pricing/mip_reference/pricing_mip.cpp
+                test/pricing/mip_reference/pricing_mip_test.cpp
+                ${DVRP_PRICING_SOURCES} src/node/src/rmp_controller.cpp
+                ${DVRP_REFERENCE_DIR}/stage_route_enumerator.cpp
+                ${DVRP_REFERENCE_DIR}/stage_reference_solver.cpp
+                ${DVRP_SOLVER_DIR}/src/solver_cplex.cpp ${DVRP_DYNAMIC_SOURCE} ${DVRP_READER_SOURCE})
+            target_include_directories(dvrp_pricing_mip_test PRIVATE
+                ${DVRP_PRICING_DIR}/include src/node/include ${DVRP_INCLUDE_DIR})
+            configure_dvrp_solver_test(dvrp_pricing_mip_test)
+            foreach (case hand random numeric certificate multistart cg dominance validation)
+                add_test(NAME dvrp_pricing_mip_${case} COMMAND dvrp_pricing_mip_test ${case})
+                set_tests_properties(dvrp_pricing_mip_${case} PROPERTIES TIMEOUT 300)
+            endforeach ()
+            add_test(NAME dvrp_pricing_mip_real COMMAND dvrp_pricing_mip_test real_cg
+                "${CMAKE_CURRENT_SOURCE_DIR}/instance/r101_D_25_E_25.txt" 10 10)
+            set_tests_properties(dvrp_pricing_mip_real PROPERTIES TIMEOUT 300)
+        endif ()
     endif ()
 endif ()

@@ -1,6 +1,6 @@
 # DVRP 已实现模块索引
 
-> 状态：已确认；最后更新：2026-10-14。
+> 状态：已确认；最后更新：2026-10-18。
 
 本目录记录已经落地并完成验证的 DVRP 模块和测试工具，明确区分生产入口与测试入口。
 
@@ -18,9 +18,11 @@
 | DVRP 数据读取 | 已实现并通过测试 | `packages_dvrp/application/dvrp` | [DVRP数据读取模块.md](DVRP数据读取模块.md) |
 | DVRP 动态状态与事件推进 | 已实现并通过手工路线测试 | `packages_dvrp/application/dvrp/src/dynamic` | [模块说明](DVRP动态状态与事件推进模块.md)、[流程与方法导读](DVRP动态调度流程与方法导读.md) |
 | 小实例完整集合划分对照 | 已实现完整枚举、CPLEX LP/MIP及测试动态闭环 | `packages_dvrp/application/dvrp/test/stage_reference` | [模块说明](DVRP小实例集合划分对照求解器.md)、[流程与方法导读](DVRP阶段对照求解流程与方法导读.md) |
-| 多起点 RMP | 已实现根LP、两阶段人工变量、加列和dual；尚无生产pricing | `packages_dvrp/application/dvrp/src/node` | [模块说明](DVRP多起点RMP模块.md)、[流程与方法导读](DVRP多起点RMP流程与方法导读.md) |
+| 多起点 RMP | 已实现根LP、两阶段人工变量、加列和dual | `packages_dvrp/application/dvrp/src/node` | [模块说明](DVRP多起点RMP模块.md)、[流程与方法导读](DVRP多起点RMP流程与方法导读.md) |
+| 多起点定价 | 已实现普通无桶/RouteOpt前向桶图，已完成RMP测试接线 | `packages_dvrp/application/dvrp/src/pricing` | [模块说明](DVRP多起点定价模块.md)、[流程与方法导读](DVRP多起点定价流程与方法导读.md) |
+| 定价MIP独立对照 | 已实现独立单路径MIP、逐起点最小rc及测试CG审核；不属于生产求解器 | `packages_dvrp/application/dvrp/test/pricing/mip_reference` | [说明与方法导读](DVRP定价MIP独立对照测试.md) |
 
-生产阶段 BP、RouteOpt 多起点标签适配、分支和加速策略尚未实现。小实例对照是测试工具，不代表 `dvrp.exe` 已能自动优化路线。
+生产根列生成控制器、阶段 BP、分支和后续增强策略尚未实现。小实例对照是测试工具，不代表 `dvrp.exe` 已能自动优化路线。
 
 ## 怎样阅读
 
