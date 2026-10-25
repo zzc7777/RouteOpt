@@ -2,7 +2,7 @@
 
 > 状态：已完成（对应当前代码）
 >
-> 最后更新：2026-10-15
+> 最后更新：2026-10-25
 >
 > 能力、构建命令、验证结果和限制见[模块说明](DVRP多起点RMP模块.md)。
 
@@ -10,7 +10,7 @@
 
 可以把 `DVRP_RmpController` 理解为 Java 中“持有一个 LP 模型的对象”：它会检查并保存路线，调用 CPLEX 求连续解，但不会自己寻找新路线。
 
-`StageProblem` 是输入数据，不会自动求解。未来的阶段 BP 控制器负责创建 RMP、调用 pricing、判断定价是否完成；根节点/搜索树尚未接入。动态控制器不能拿 RMP 的分数路线直接派车。
+`StageProblem` 是输入数据，不会自动求解。现在[根列生成控制器](DVRP根节点列生成流程与方法导读.md)负责创建RMP、调用pricing并核对结束证据；搜索树尚未接入。动态控制器不能拿RMP的分数路线直接派车。
 
 目前真正调用这些入口的是 [rmp_test.cpp](../../../packages_dvrp/application/dvrp/test/rmp/rmp_test.cpp)。公开声明见 [rmp_controller.hpp](../../../packages_dvrp/application/dvrp/src/node/include/rmp_controller.hpp)，内部辅助方法均在 [rmp_controller.cpp](../../../packages_dvrp/application/dvrp/src/node/src/rmp_controller.cpp)。
 
@@ -63,6 +63,8 @@
 
 此方法只优化当前已有列，既不生成新列，也不证明尚未生成的列不存在。
 
+根控制器调用新增的 `solveLp(seconds)` 重载，传入本次剩余预算。它与无参版执行同一求解/复核逻辑；无参版每次使用原默认时限，不继承上一次临时覆盖值。设置时限不会更新模型版本。
+
 内部先清除上一次结果，再调用 `Solver::optimize()`。`RmpDetail::classifyLpStatus()` 区分最优、超时、错误；只有当前 LP 最优时，才进入 `Impl::readOptimal()`。
 
 `readOptimal()` 从 solver 读取变量值、目标、dual 和 reduced cost，再独立核对：
@@ -106,7 +108,7 @@ Phase-I 返回的是人工量，不是行驶距离。Phase-II 才有 `routeCost`
 
 Phase-I 中一条真实路线的目标系数为0，Phase-II才是距离。外部路线还要扣掉自己的外部起点dual；原始路线没有车队行dual。容量、时间窗和允许路线集合不随这两个目标阶段改变。
 
-原RMP测试中的 `scanPricing()` 用枚举全集计算 reduced cost，反复调用加列和求解入口；它只是测试驱动，不是生产 pricing。 后续另有[双版本标签定价及方法导读](DVRP多起点定价流程与方法导读.md)，其RMP接线测试用真正pricing供列，完整枚举仅负责核对；生产根控制器仍未接入。人工量正且扫描全集仍无改善列时，测试才有资格与完整 LP 的不可行结论比较。
+原RMP测试中的 `scanPricing()` 用枚举全集计算 reduced cost，反复调用加列和求解入口；它只是测试驱动。已有[双版本标签定价](DVRP多起点定价流程与方法导读.md)及[正式根循环](DVRP根节点列生成流程与方法导读.md)，生产由pricing供列，枚举仅负责测试核对。人工量正也不能单独判不可行，正式根循环还检查完整定价和人工目标下界。
 
 ## 9. 诊断与使用边界
 

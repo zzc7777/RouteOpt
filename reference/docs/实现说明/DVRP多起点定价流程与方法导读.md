@@ -2,7 +2,7 @@
 
 > 状态：已完成（对应当前双版本定价源码）
 >
-> 最后更新：2026-10-18
+> 最后更新：2026-10-25
 >
 > 能力、构建命令和验证记录见[模块说明](DVRP多起点定价模块.md)，稳定接口见[设计](../设计/M1-标准BP-DVRP/03-多起点定价文件与接口.md)。本文只讲实际执行，不把测试控制循环称为完整 BP。
 
@@ -18,7 +18,7 @@ Pricing 不决定“整支车队怎么跑”，而是回答：**给定本阶段�
   └─ 再求 LP，重新取 dual
 ~~~
 
-目前这个循环位于[pricing_rmp_test.cpp](../../../packages_dvrp/application/dvrp/test/pricing/pricing_rmp_test.cpp)，未来生产根控制器尚未实现。main.cpp 仍是 reader。
+原接线循环保留在[pricing_rmp_test.cpp](../../../packages_dvrp/application/dvrp/test/pricing/pricing_rmp_test.cpp)作回归；现在另有[生产根循环及导读](DVRP根节点列生成流程与方法导读.md)。main.cpp仍是reader。
 
 StageProblem、RmpDuals、StageRoute 是数据；DVRP_PricingController 才是执行方法的对象。Label、Bucket、Work 都是内部工作区，不传给动态控制器，也不是车辆实际状态。
 

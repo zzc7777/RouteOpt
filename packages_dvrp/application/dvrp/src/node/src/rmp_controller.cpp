@@ -288,11 +288,18 @@ namespace RouteOpt::Application::DVRP {
     }
 
     RmpLpResult DVRP_RmpController::solveLp() {
+        return solveLp(impl_->options.timeLimitSeconds);
+    }
+
+    RmpLpResult DVRP_RmpController::solveLp(double timeLimitSeconds) {
+        if (!std::isfinite(timeLimitSeconds) || timeLimitSeconds < 0)
+            throw std::invalid_argument("LP time limit must be finite and nonnegative");
         auto& p = *impl_;
         const auto begin = std::chrono::steady_clock::now();
         auto result = p.resultHeader(); p.last.reset();
         try {
             p.requireUsable();
+            checked(p.owner.solver.setEnvTimeLimit(timeLimitSeconds),"LP time limit");
             if (p.rows.empty()) {
                 result.status = RmpLpStatus::OptimalRmp;
                 result.message = "Empty RMP: analytic optimum (no solver status)";
@@ -307,6 +314,8 @@ namespace RouteOpt::Application::DVRP {
                 p.usable = false;
                 result.message += "; unexpected auxiliary LP failure, NOT proof of stage infeasibility";
             }
+        } catch (const std::bad_alloc&) {
+            p.usable = false; p.last.reset(); throw; // Let the root caller classify resource exhaustion.
         } catch (const std::exception& e) {
             const auto raw = result.rawStatus;
             result = p.resultHeader(); result.rawStatus = raw; result.message = e.what();

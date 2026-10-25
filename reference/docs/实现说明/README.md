@@ -1,6 +1,6 @@
 # DVRP 已实现模块索引
 
-> 状态：已确认；最后更新：2026-10-18。
+> 状态：已确认；最后更新：2026-10-25。
 
 本目录记录已经落地并完成验证的 DVRP 模块和测试工具，明确区分生产入口与测试入口。
 
@@ -21,8 +21,9 @@
 | 多起点 RMP | 已实现根LP、两阶段人工变量、加列和dual | `packages_dvrp/application/dvrp/src/node` | [模块说明](DVRP多起点RMP模块.md)、[流程与方法导读](DVRP多起点RMP流程与方法导读.md) |
 | 多起点定价 | 已实现普通无桶/RouteOpt前向桶图，已完成RMP测试接线 | `packages_dvrp/application/dvrp/src/pricing` | [模块说明](DVRP多起点定价模块.md)、[流程与方法导读](DVRP多起点定价流程与方法导读.md) |
 | 定价MIP独立对照 | 已实现独立单路径MIP、逐起点最小rc及测试CG审核；不属于生产求解器 | `packages_dvrp/application/dvrp/test/pricing/mip_reference` | [说明与方法导读](DVRP定价MIP独立对照测试.md) |
+| 根节点列生成 | 已实现两阶段RMP/pricing正式循环、数值界及总预算 | `packages_dvrp/application/dvrp/src/column_generation` | [模块说明](DVRP根节点列生成模块.md)、[流程与方法导读](DVRP根节点列生成流程与方法导读.md) |
 
-生产根列生成控制器、阶段 BP、分支和后续增强策略尚未实现。小实例对照是测试工具，不代表 `dvrp.exe` 已能自动优化路线。
+阶段BP、分支和后续增强策略尚未实现。根CG返回LP，不代表 `dvrp.exe` 已能自动优化并执行整数路线。
 
 ## 怎样阅读
 

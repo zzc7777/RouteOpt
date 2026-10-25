@@ -351,6 +351,22 @@ namespace {
         rejects([&]{DVRP_RmpController bad(sample(),{1e100});},"CPLEX parameter error expected");
         DVRP_RmpController good(sample()); close(*optimal(good).artificialSum,3,"new environment after failure");
     }
+    void perCallLimit() {
+        DVRP_RmpController rmp(sample(),{60}); rmp.addInitialRoutes();
+        const auto first=rmp.solveLp(30);
+        check(first.status==RmpLpStatus::OptimalRmp,first.message);
+        const auto zero=rmp.solveLp(0);
+        check(zero.status==RmpLpStatus::OptimalRmp || zero.status==RmpLpStatus::TimeLimit,zero.message);
+        const auto next=rmp.solveLp();
+        check(next.status==RmpLpStatus::OptimalRmp,next.message);
+        check(next.modelRevision==first.modelRevision && zero.modelRevision==first.modelRevision,"time cap changed revision");
+        close(*next.objective,*first.objective,"default call after override");
+        for(double bad:{-1.0,std::numeric_limits<double>::infinity(),std::numeric_limits<double>::quiet_NaN()})
+            rejects([&]{rmp.solveLp(bad);},"invalid per-call limit accepted");
+        check(rmp.solveLp(60).status==RmpLpStatus::OptimalRmp,"invalid limit corrupted model");
+        rmp.enterCostPhase(); close(*optimal(rmp).routeCost,9,"phase switch after time overrides");
+        std::cout<<"per-call zero-second LP raw="<<(zero.rawStatus?std::to_string(*zero.rawStatus):"analytic")<<'\n';
+    }
     void timeLimit() {
         DVRP_RmpController rmp(fractionalStage(),{0}); rmp.addInitialRoutes();
         const auto result=rmp.solveLp();
@@ -367,7 +383,7 @@ int main(int argc, char** argv) {
         {"matrix",matrix},{"phases",phases},{"initial",initial},{"resources",resources},
         {"validation",validation},{"identity",identity},{"duplicate",duplicate},{"empty",empty},
         {"infeasible",infeasible},{"full_lp",fullLp},{"fractional",fractional},{"pricing",pricing},
-        {"size",size},{"lifecycle",lifecycle},{"status",status},{"time_limit",timeLimit}};
+        {"size",size},{"lifecycle",lifecycle},{"status",status},{"time_limit",timeLimit},{"per_call_limit",perCallLimit}};
     try {
         bool ran=false;
         for(const auto& [name,run]:cases) if(argc==1 || name==argv[1]) { run(); ran=true; std::cout<<"PASS rmp "<<name<<'\n'; }

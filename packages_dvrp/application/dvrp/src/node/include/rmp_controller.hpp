@@ -72,6 +72,7 @@ namespace RouteOpt::Application::DVRP {
         std::vector<std::size_t> addInitialRoutes();
         std::vector<std::size_t> addRoutes(const std::vector<StageRoute>& routes);
         RmpLpResult solveLp();
+        RmpLpResult solveLp(double timeLimitSeconds); // This call only; no model revision change.
         void enterCostPhase(); // Requires the controller's own current zero-artificial result.
         RmpModelSnapshot inspectModel() const; // Actual solver data, not cached coefficients.
         const std::vector<RmpColumn>& columns() const; // Read-only; invalidated by addRoutes.

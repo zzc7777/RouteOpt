@@ -2,7 +2,7 @@
 
 > 状态：已完成（根 RMP 能力，不是完整列生成或 BP）
 >
-> 最后更新：2026-10-15
+> 最后更新：2026-10-25
 >
 > 详细执行顺序见[流程与方法导读](DVRP多起点RMP流程与方法导读.md)；稳定边界见[文件与接口](../设计/M1-标准BP-DVRP/02-多起点RMP文件与接口.md)。
 
@@ -11,14 +11,14 @@
 接收 `StageProblem` 和部分可行 `StageRoute`，建立独立连续 LP，支持两阶段人工变量、初始列、增量加列、求解与有效 dual 输出。数学语义遵循[v4](../模型和推导/DVRP%20数学模型-v4.md)。
 
 ```text
-测试程序（未来为阶段 BP 控制器）
+根列生成控制器 / 测试程序（未来为阶段 BP 控制器）
   → DVRP_RmpController(stage)
   → addInitialRoutes / addRoutes
   → solveLp → Phase-I 人工量 / Phase-II 成本 / dual
-  → pricing 返回新路线，再 addRoutes（目前由测试驱动）
+  → pricing 返回新路线，再 addRoutes
 ```
 
-原rmp_test.cpp用枚举扫描模拟最后一条反馈；后续已完成的[双版本定价](DVRP多起点定价模块.md)另在pricing_rmp_test.cpp使用真实标签算法供列，并与完整LP对照。尚无生产根列生成控制器。`dvrp.exe` 仍只读取实例，RMP 不输出可执行的 `StageSolution`。
+原rmp_test.cpp用枚举扫描模拟最后一条反馈；pricing_rmp_test.cpp另用真实标签算法供列。现在[生产根列生成控制器](DVRP根节点列生成模块.md)统一管理正式循环。`dvrp.exe` 仍只读取实例，RMP 不输出可执行的 `StageSolution`。
 
 ## 2. 文件与所有权
 
@@ -52,6 +52,8 @@ Phase-I 为每行建立一个非负人工变量，真实列目标系数为0，�
 `enterCostPhase()` 只接受控制器内部最新一次、已复核且人工总量不超过容差的 Phase-I 最优结果；不能用外部伪造结果授权切换。切换后必须重新求 LP 并复核真实等式，不直接宣布成功。
 
 `solveLp()` 返回：
+
+2026-10-25新增 `solveLp(double timeLimitSeconds)`，用于根控制器传入剩余预算；每次求解前重设CPLEX时限。显式值只作用于本次，无参调用仍恢复构造时默认值；不改变模型版本、默认选项或列池。非有限/负时限在求解前拒绝且不破坏已有模型。内存分配异常清理当前有效结果后向上传播，由根控制器归类为资源不足。
 
 | 字段 | 含义 |
 | --- | --- |
@@ -87,7 +89,7 @@ cmake --build build/dvrp-rmp --config Debug -j 8
 ctest --test-dir build/dvrp-rmp -C Debug --output-on-failure
 ```
 
-仅运行 RMP：`ctest --test-dir build/dvrp-rmp -C Release -R dvrp_rmp_ --output-on-failure`。直接运行 `build/dvrp-rmp/Release/dvrp_rmp_test.exe phases` 可查看手算摘要；不带参数运行全部16组。
+仅运行 RMP：`ctest --test-dir build/dvrp-rmp -C Release -R dvrp_rmp_ --output-on-failure`。直接运行 `build/dvrp-rmp/Release/dvrp_rmp_test.exe phases` 可查看手算摘要；不带参数运行全部17组（原16组＋2026-10-25新增 `per_call_limit`）。新一轮联合验证见[根CG模块](DVRP根节点列生成模块.md)。
 
 2026-10-14 本机 MSVC19.44、CPLEX22.1：Release / Debug 均 **56/56 CTest 通过**（原40项＋RMP16项）；仅开启RMP测试时Release **41/41通过**；两项 solver 开关均关闭后 Release **25/25通过**，含434实例读取。没有使用 `-u`。Gurobi 后端和关闭 `BUILD_TESTING` 的非法组合明确拒绝。
 
@@ -102,7 +104,7 @@ ctest --test-dir build/dvrp-rmp -C Debug --output-on-failure
 
 ## 7. 限制及下一步
 
-没有生产根列生成控制器、ng、RF、树、cuts、列删除、子节点复制或重新开启Phase-I。双版本pricing已实现并完成测试接线，下一步确定正式根列生成的需求及接口。当前生产能力不受5客户限制，但没有真实大实例BP性能结论。
+根列生成控制器已落地；尚无ng、RF、树、cuts、列删除、子节点复制或重新开启Phase-I。下一步单独设计分支与子节点恢复。当前生产能力不受5客户限制，但没有真实大实例BP性能结论。
 
 尚未实际触发 RMP 运行超时、增量写入中途 API 失败或数值失效；映射和失败处理有代码路径，不能冒充这些故障均已实测。重复创建不是专用泄漏检测；未验证 Gurobi/Linux/macOS。
 

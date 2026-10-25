@@ -13,6 +13,7 @@ include(CTest)
 option(DVRP_BUILD_REFERENCE_SOLVER "Build the small complete-route CPLEX LP/MIP test tool" OFF)
 option(DVRP_BUILD_RMP_TESTS "Build the multi-start RMP tests (CPLEX)" OFF)
 option(DVRP_BUILD_PRICING_TESTS "Build plain/bucket pricing tests (solver optional)" OFF)
+option(DVRP_BUILD_ROOT_CG_TESTS "Build production root column-generation tests (CPLEX)" OFF)
 
 set(DVRP_PRICING_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/pricing")
 set(DVRP_PRICING_SOURCES
@@ -125,7 +126,7 @@ if (DVRP_BUILD_PRICING_TESTS)
     endforeach ()
 endif ()
 
-if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS)
+if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TESTS)
     if (NOT BUILD_TESTING)
         message(FATAL_ERROR "DVRP solver tests require BUILD_TESTING=ON")
     endif ()
@@ -183,6 +184,22 @@ if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS)
             set_tests_properties(dvrp_reference_${case} PROPERTIES TIMEOUT 120)
         endforeach ()
     endif ()
+    if (DVRP_BUILD_ROOT_CG_TESTS)
+        add_executable(dvrp_root_cg_test test/root_cg/root_cg_test.cpp
+            src/column_generation/src/root_cg_controller.cpp src/node/src/rmp_controller.cpp
+            ${DVRP_PRICING_SOURCES} ${DVRP_DYNAMIC_SOURCE}
+            ${DVRP_REFERENCE_DIR}/stage_route_enumerator.cpp
+            ${DVRP_REFERENCE_DIR}/stage_reference_solver.cpp
+            ${DVRP_SOLVER_DIR}/src/solver_cplex.cpp)
+        target_include_directories(dvrp_root_cg_test PRIVATE
+            src/column_generation/include src/node/include ${DVRP_PRICING_DIR}/include)
+        configure_dvrp_solver_test(dvrp_root_cg_test)
+        foreach (case hand phases fractional infeasible empty random bounds numeric context
+                duplicate limits status validation lifecycle size)
+            add_test(NAME dvrp_root_cg_${case} COMMAND dvrp_root_cg_test ${case})
+            set_tests_properties(dvrp_root_cg_${case} PROPERTIES TIMEOUT 180)
+        endforeach ()
+    endif ()
     if (DVRP_BUILD_RMP_TESTS)
         add_executable(dvrp_rmp_test test/rmp/rmp_test.cpp src/node/src/rmp_controller.cpp
             ${DVRP_REFERENCE_DIR}/stage_route_enumerator.cpp
@@ -191,7 +208,7 @@ if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS)
         target_include_directories(dvrp_rmp_test PRIVATE src/node/include)
         configure_dvrp_solver_test(dvrp_rmp_test)
         foreach (case matrix phases initial resources validation identity duplicate empty infeasible
-                full_lp fractional pricing size lifecycle status time_limit)
+                full_lp fractional pricing size lifecycle status time_limit per_call_limit)
             add_test(NAME dvrp_rmp_${case} COMMAND dvrp_rmp_test ${case})
             set_tests_properties(dvrp_rmp_${case} PROPERTIES TIMEOUT 120)
         endforeach ()
