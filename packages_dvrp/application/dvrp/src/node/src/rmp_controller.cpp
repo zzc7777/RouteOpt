@@ -64,6 +64,7 @@ namespace RouteOpt::Application::DVRP {
 
     struct DVRP_RmpController::Impl {
         StageProblem stage;
+        BranchContext context;
         RmpOptions options;
         ModelOwner owner;
         std::vector<RmpRow> rows;
@@ -76,7 +77,8 @@ namespace RouteOpt::Application::DVRP {
         bool usable{true};
         std::optional<RmpLpResult> last;
 
-        Impl(const StageProblem& source, RmpOptions opts) : stage(source), options(opts) {
+        Impl(const StageProblem& source, const BranchContext& branches, RmpOptions opts)
+            : stage(source), context(normalizeBranches(source,branches)), options(opts) {
             validateStage();
             auto& solver = owner.solver;
             checked(solver.loadEnv(nullptr),"load CPLEX environment/license");
@@ -179,6 +181,7 @@ namespace RouteOpt::Application::DVRP {
         RmpLpResult resultHeader() const {
             RmpLpResult r;
             r.stageId = stage.stageId; r.modelRevision = revision; r.phase = phase;
+            r.context = context;
             return r;
         }
         void readOptimal(RmpLpResult& r) {
@@ -217,6 +220,7 @@ namespace RouteOpt::Application::DVRP {
             verify(near(objective,actualObjective),"primal objective mismatch");
             verify(near(objective,std::accumulate(dual.begin(),dual.end(),0.0)),"primal/dual objective gap");
             RmpDuals d{stage.stageId,revision,phase,{},{}};
+            d.context = context;
             for (const auto& [id,h] : customerRows) d.customers.emplace(id,dual[h]);
             for (const auto& [key,h] : externalRows) d.externalStarts.emplace(key,dual[h]);
             r.lambda.assign(x.begin()+nr,x.end()); r.artificial.assign(x.begin(),x.begin()+nr);
@@ -230,7 +234,9 @@ namespace RouteOpt::Application::DVRP {
     };
 
     DVRP_RmpController::DVRP_RmpController(const StageProblem& stage, RmpOptions options)
-        : impl_(std::make_unique<Impl>(stage,options)) {}
+        : DVRP_RmpController(stage,BranchContext{},options) {}
+    DVRP_RmpController::DVRP_RmpController(const StageProblem& stage, const BranchContext& context, RmpOptions options)
+        : impl_(std::make_unique<Impl>(stage,context,options)) {}
     DVRP_RmpController::~DVRP_RmpController() = default;
 
     const std::vector<RmpColumn>& DVRP_RmpController::columns() const { impl_->requireUsable(); return impl_->columns; }
@@ -244,6 +250,7 @@ namespace RouteOpt::Application::DVRP {
         for (const auto& route : routes) {
             const auto cost = p.evaluate(route);
             input(cost.has_value(),"route violates capacity, time window or return deadline");
+            input(routeAllowed(route,p.context),"route violates node branch restrictions");
             Impl::RouteKey key{route.startKey,route.customerSequence};
             if (const auto found = p.columnIds.find(key); found != p.columnIds.end()) ids.push_back(found->second);
             else if (const auto added = pendingIds.find(key); added != pendingIds.end()) ids.push_back(added->second);
@@ -278,7 +285,9 @@ namespace RouteOpt::Application::DVRP {
     std::vector<std::size_t> DVRP_RmpController::addInitialRoutes() {
         auto& p = *impl_; p.requireUsable();
         std::vector<StageRoute> routes;
-        auto tryRoute = [&](StageRoute route) { if (p.evaluate(route)) routes.push_back(std::move(route)); };
+        auto tryRoute = [&](StageRoute route) {
+            if (p.evaluate(route) && routeAllowed(route,p.context)) routes.push_back(std::move(route));
+        };
         for (const auto& start : p.stage.externalStarts) tryRoute({start.startKey,{}});
         for (const auto& c : p.stage.customers) {
             tryRoute({0,{c.id}});
@@ -347,6 +356,7 @@ namespace RouteOpt::Application::DVRP {
         auto& solver = p.owner.solver;
         RmpModelSnapshot s;
         s.stageId = p.stage.stageId; s.modelRevision = p.revision; s.phase = p.phase; s.rows = p.rows;
+        s.context = p.context;
         try {
             int nr = 0, nc = 0;
             checked(solver.getNumRow(&nr),"inspect rows"); checked(solver.getNumCol(&nc),"inspect columns");

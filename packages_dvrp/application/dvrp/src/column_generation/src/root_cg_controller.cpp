@@ -38,7 +38,8 @@ namespace RouteOpt::Application::DVRP {
             require(lp.phase==RmpPhase::Cost || lp.phase==RmpPhase::Feasibility,"unknown LP phase");
             const auto& d=*lp.duals;
             require(lp.stageId==s.stageId && d.stageId==lp.stageId
-                    && d.modelRevision==lp.modelRevision && d.phase==lp.phase,"stale LP/dual context");
+                    && d.modelRevision==lp.modelRevision && d.phase==lp.phase && d.context==lp.context,"stale LP/dual context");
+            require(normalizeBranches(s,lp.context)==lp.context,"noncanonical LP branch context");
             require(d.customers.size()==s.customers.size() && d.externalStarts.size()==s.externalStarts.size(),
                     "dual key count mismatch");
             for (const auto& c:s.customers) {
@@ -53,6 +54,7 @@ namespace RouteOpt::Application::DVRP {
                         "cost phase not a verified real-route LP");
         }
         void validateWitness(const StageProblem& s, const RmpDuals& duals, const PricedRoute& r) {
+            require(routeAllowed(r.route,duals.context),"witness violates node branch restrictions");
             const StartSpec* start=&s.originStart;
             if (r.route.startKey!=0) {
                 const auto it=std::find_if(s.externalStarts.begin(),s.externalStarts.end(),
@@ -106,7 +108,7 @@ namespace RouteOpt::Application::DVRP {
             validateLp(s,lp);
             require(p.status==PricingStatus::Complete,"incomplete pricing cannot supply a certificate");
             require(p.stageId==lp.stageId && p.modelRevision==lp.modelRevision && p.phase==lp.phase
-                    && p.backend==backend,"pricing context/backend mismatch");
+                    && p.backend==backend && p.context==lp.context,"pricing context/backend mismatch");
             std::set<int> expected{0}, actual, candidateKeys;
             for (const auto& k:s.externalStarts) expected.insert(k.startKey);
             std::map<int,const PricedRoute*> negative;
@@ -137,6 +139,7 @@ namespace RouteOpt::Application::DVRP {
         RootCgBound computeBound(const StageProblem& s, const RmpLpResult& lp, const PricingResult& p) {
             validatePricingResult(s,lp,p,p.backend);
             RootCgBound b; b.stageId=s.stageId; b.modelRevision=lp.modelRevision; b.phase=lp.phase;
+            b.context=lp.context;
             b.rowCount=s.customers.size()+s.externalStarts.size(); b.rmpObjective=*lp.objective;
             double absDualSum=0, witnessScale=0;
             auto addDual=[&](double y) {
@@ -171,7 +174,7 @@ namespace RouteOpt::Application::DVRP {
         }
         RootCgStatus classifyBound(const RmpLpResult& lp, const RootCgBound& b, double absolute, double relative) {
             nonnegative(absolute); nonnegative(relative);
-            require(b.stageId==lp.stageId && b.modelRevision==lp.modelRevision && b.phase==lp.phase,
+            require(b.stageId==lp.stageId && b.modelRevision==lp.modelRevision && b.phase==lp.phase && b.context==lp.context,
                     "stale bound");
             finite(b.lowerBound); finite(b.gap); finite(b.rmpObjective);
             require(b.gap>=0,"negative gap");
@@ -185,6 +188,9 @@ namespace RouteOpt::Application::DVRP {
     }
 
     RootCgResult DVRP_RootCgController::solve(const StageProblem& s, const RootCgOptions& o) const {
+        return solve(s,BranchContext{},o);
+    }
+    RootCgResult DVRP_RootCgController::solve(const StageProblem& s, const BranchContext& context, const RootCgOptions& o) const {
         const auto began=Clock::now();
         RootCgResult result; result.stageId=s.stageId; result.backend=o.pricing.backend;
         auto elapsed=[&]{return std::chrono::duration<double>(Clock::now()-began).count();};
@@ -194,14 +200,15 @@ namespace RouteOpt::Application::DVRP {
             return left;
         };
         try {
+            result.context=normalizeBranches(s,context);
             nonnegative(o.timeLimitSeconds); nonnegative(o.rmp.timeLimitSeconds); nonnegative(o.pricing.timeLimitSeconds);
             nonnegative(o.absoluteGapTolerance); nonnegative(o.relativeGapTolerance);
             require(o.pricing.backend==PricingBackend::PlainLabeling || o.pricing.backend==PricingBackend::BucketGraph,
                     "unknown pricing backend");
             require(o.pricing.backend!=PricingBackend::BucketGraph || o.pricing.bucketCount>0,"bucketCount must be positive");
             remaining();
-            DVRP_RmpController rmp(s,o.rmp); remaining();
-            DVRP_PricingController pricing(s); remaining();
+            DVRP_RmpController rmp(s,result.context,o.rmp); remaining();
+            DVRP_PricingController pricing(s,result.context); remaining();
             if (o.addInitialRoutes) { rmp.addInitialRoutes(); remaining(); }
             for (;;) {
                 remaining();
@@ -209,6 +216,7 @@ namespace RouteOpt::Application::DVRP {
                     throw Stop{RootCgStatus::IterationLimit,"maximum number of root LP solves reached"};
                 auto& log=result.iterations.emplace_back();
                 log.iteration=result.iterations.size(); log.stageId=s.stageId;
+                log.nodeId=result.context.nodeId;
                 log.columnsBefore=log.columnsAfter=rmp.columns().size();
                 log.lpTimeLimit=std::min(o.rmp.timeLimitSeconds,remaining());
                 const auto lp=rmp.solveLp(log.lpTimeLimit);
@@ -216,6 +224,7 @@ namespace RouteOpt::Application::DVRP {
                 log.lpSeconds=lp.solveSeconds; log.objective=lp.objective; log.artificialSum=lp.artificialSum;
                 if (lp.status==RmpLpStatus::OptimalRmp) {
                     validateLp(s,lp);
+                    require(lp.context==result.context,"LP belongs to another node");
                     require(lp.lambda.size()==rmp.columns().size(),"LP/column snapshot size mismatch");
                     result.snapshot=RootCgSnapshot{lp,rmp.columns(),{}};
                 }

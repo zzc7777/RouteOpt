@@ -116,4 +116,4 @@ Phase-I 中一条真实路线的目标系数为0，Phase-II才是距离。外部
 
 非法输入会在加列前被拒绝；写入中途 API 失败则模型失效，下一次必须重建。超时不给可用于定价证明的数据。无客户且无外部起点时解析返回空最优结果；有外部起点时仍必须为每辆车安排后续路线。
 
-本模块没有子节点复制、RF限制、重新开启Phase-I或生产事件循环。不要把一次 `OptimalRmp` 当作阶段最优，也不要把分数结果传给 `DynamicController::acceptSolution()`。
+现已增加带 `BranchContext` 的构造：初始列先过滤RF/专属有向弧限制，显式加列违规则整批拒绝；LP和dual回传上下文。子节点是新建RMP并从Phase-I启动，不复制父模型或重开旧模型。详细过程见[分支方法导读](DVRP双策略分支流程与方法导读.md)。不要把一次 `OptimalRmp` 当作阶段最优，也不要把分数结果传给 `DynamicController::acceptSolution()`。

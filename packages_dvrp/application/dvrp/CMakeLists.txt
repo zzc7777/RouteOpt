@@ -14,9 +14,15 @@ option(DVRP_BUILD_REFERENCE_SOLVER "Build the small complete-route CPLEX LP/MIP 
 option(DVRP_BUILD_RMP_TESTS "Build the multi-start RMP tests (CPLEX)" OFF)
 option(DVRP_BUILD_PRICING_TESTS "Build plain/bucket pricing tests (solver optional)" OFF)
 option(DVRP_BUILD_ROOT_CG_TESTS "Build production root column-generation tests (CPLEX)" OFF)
+option(DVRP_BUILD_BRANCHING_TESTS "Build branching/pricing semantic tests (no solver)" OFF)
+option(DVRP_BUILD_BRANCHING_CG_TESTS "Build constrained node CG tests (CPLEX)" OFF)
+
+set(DVRP_BRANCHING_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/branching/src/branching.cpp")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/branching/include")
 
 set(DVRP_PRICING_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/pricing")
 set(DVRP_PRICING_SOURCES
+    ${DVRP_BRANCHING_SOURCE}
     ${DVRP_PRICING_DIR}/src/pricing_controller.cpp
     ${DVRP_PRICING_DIR}/src/labeling_plain.cpp
     ${DVRP_PRICING_DIR}/src/bucket_graph.cpp
@@ -126,7 +132,26 @@ if (DVRP_BUILD_PRICING_TESTS)
     endforeach ()
 endif ()
 
-if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TESTS)
+if (DVRP_BUILD_BRANCHING_TESTS)
+    if (NOT BUILD_TESTING)
+        message(FATAL_ERROR "DVRP branching tests require BUILD_TESTING=ON")
+    endif ()
+    add_executable(dvrp_branching_test test/branching/branching_test.cpp ${DVRP_PRICING_SOURCES}
+        test/stage_reference/stage_route_enumerator.cpp ${DVRP_DYNAMIC_SOURCE})
+    target_include_directories(dvrp_branching_test PRIVATE
+        ${DVRP_PRICING_DIR}/include src/node/include test/stage_reference
+        ${DVRP_DYNAMIC_INCLUDE_DIR} ${ROUTEOPT_CONFIG_INCLUDE_DIR})
+    if (MSVC)
+        target_compile_options(dvrp_branching_test PRIVATE /utf-8)
+    endif ()
+    foreach (case normalize routes candidates no_candidate validation rf_pricing arc_pricing
+            conflicts random dominance limits identity)
+        add_test(NAME dvrp_branching_${case} COMMAND dvrp_branching_test ${case})
+        set_tests_properties(dvrp_branching_${case} PROPERTIES TIMEOUT 180)
+    endforeach ()
+endif ()
+
+if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TESTS OR DVRP_BUILD_BRANCHING_CG_TESTS)
     if (NOT BUILD_TESTING)
         message(FATAL_ERROR "DVRP solver tests require BUILD_TESTING=ON")
     endif ()
@@ -171,6 +196,20 @@ if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TE
                 VERBATIM)
         endif ()
     endfunction()
+    if (DVRP_BUILD_BRANCHING_CG_TESTS)
+        add_executable(dvrp_branching_cg_test test/branching/branching_cg_test.cpp
+            src/column_generation/src/root_cg_controller.cpp src/node/src/rmp_controller.cpp
+            ${DVRP_PRICING_SOURCES} ${DVRP_DYNAMIC_SOURCE}
+            ${DVRP_REFERENCE_DIR}/stage_route_enumerator.cpp
+            ${DVRP_SOLVER_DIR}/src/solver_cplex.cpp)
+        target_include_directories(dvrp_branching_cg_test PRIVATE
+            src/column_generation/include src/node/include ${DVRP_PRICING_DIR}/include)
+        configure_dvrp_solver_test(dvrp_branching_cg_test)
+        foreach (case rf arc external conflict random partition context rmp limits empty)
+            add_test(NAME dvrp_branching_cg_${case} COMMAND dvrp_branching_cg_test ${case})
+            set_tests_properties(dvrp_branching_cg_${case} PROPERTIES TIMEOUT 240)
+        endforeach ()
+    endif ()
     if (DVRP_BUILD_REFERENCE_SOLVER)
         add_executable(dvrp_stage_reference_test
             ${DVRP_REFERENCE_DIR}/stage_reference_test.cpp
@@ -201,7 +240,7 @@ if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TE
         endforeach ()
     endif ()
     if (DVRP_BUILD_RMP_TESTS)
-        add_executable(dvrp_rmp_test test/rmp/rmp_test.cpp src/node/src/rmp_controller.cpp
+        add_executable(dvrp_rmp_test test/rmp/rmp_test.cpp src/node/src/rmp_controller.cpp ${DVRP_BRANCHING_SOURCE}
             ${DVRP_REFERENCE_DIR}/stage_route_enumerator.cpp
             ${DVRP_REFERENCE_DIR}/stage_reference_solver.cpp
             ${DVRP_SOLVER_DIR}/src/solver_cplex.cpp ${DVRP_DYNAMIC_SOURCE})

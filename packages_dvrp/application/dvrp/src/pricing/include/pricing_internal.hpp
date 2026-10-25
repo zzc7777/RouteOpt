@@ -28,9 +28,10 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
     };
     struct PreparedStage {
         StageProblem stage;
+        BranchContext context;
         std::map<int,int> index;
         std::vector<std::vector<double>> distances; // Customers 1..n, return n+1. Row 0 unused.
-        explicit PreparedStage(const StageProblem& source);
+        explicit PreparedStage(const StageProblem& source, const BranchContext& context = {});
         int n() const { return static_cast<int>(stage.customers.size()); }
     };
     struct Label {
@@ -51,6 +52,14 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
         std::vector<Label> labels;
         std::size_t bestLabel{NO_LABEL};
         double bestRc{INF}, bestCost{};
+        // Compiled per-start rules. RF external truth is constant (-1=true,-2=false).
+        struct RfRule { int first, second; bool together; };
+        std::vector<RfRule> rfRules;
+        routeOptLong rfMask, bannedCustomers;
+        std::vector<int> forcedNext, forcedPrevious; // -1=none, -2=conflict
+        std::vector<std::pair<int,int>> forbiddenArcs;
+        bool rfAllowed(const routeOptLong& visited, bool finishing) const;
+        bool arcAllowed(int from, int to) const;
         Work(const PreparedStage&, const StartSpec&, const RmpDuals&, const Budget&, PricingStatistics&);
         double arc(int from, int to) const;
         std::optional<Label> extend(std::size_t parent, int customer);

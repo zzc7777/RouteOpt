@@ -6,6 +6,7 @@
 #define ROUTEOPT_DVRP_RMP_CONTROLLER_HPP
 
 #include "dynamic_data.hpp"
+#include "branching.hpp"
 #include <map>
 #include <memory>
 #include <optional>
@@ -31,6 +32,7 @@ namespace RouteOpt::Application::DVRP {
         std::size_t stageId{}, modelRevision{};
         RmpPhase phase{RmpPhase::Feasibility};
         std::map<int, double> customers, externalStarts;
+        BranchContext context;
     };
     struct RmpLpResult {
         std::size_t stageId{}, modelRevision{};
@@ -43,6 +45,7 @@ namespace RouteOpt::Application::DVRP {
         std::optional<RmpDuals> duals;
         double solveSeconds{};
         std::string message;
+        BranchContext context;
     };
     struct RmpOptions { double timeLimitSeconds{60.0}; }; // Per LP, not a BP time budget.
 
@@ -60,11 +63,13 @@ namespace RouteOpt::Application::DVRP {
         std::vector<double> rhs;
         std::vector<char> senses;
         std::vector<RmpSnapshotColumn> columns;
+        BranchContext context;
     };
 
     class DVRP_RmpController {
     public:
         explicit DVRP_RmpController(const StageProblem& stage, RmpOptions options = {});
+        DVRP_RmpController(const StageProblem& stage, const BranchContext& context, RmpOptions options);
         ~DVRP_RmpController();
         DVRP_RmpController(const DVRP_RmpController&) = delete;
         DVRP_RmpController& operator=(const DVRP_RmpController&) = delete;

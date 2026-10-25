@@ -29,7 +29,8 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
         if(std::chrono::duration<double>(Clock::now()-began).count()>=options.timeLimitSeconds)
             throw Interrupted{PricingStatus::TimeLimit,"pricing time limit (all starts)"};
     }
-    PreparedStage::PreparedStage(const StageProblem& source):stage(source) {
+    PreparedStage::PreparedStage(const StageProblem& source,const BranchContext& branches)
+        :stage(source),context(normalizeBranches(source,branches)) {
         const auto& s=stage;
         require(s.customers.size()<MAX_NUM_CUSTOMERS,"customer bitset capacity exceeded");
         finite(s.currentTime,"currentTime");finite(s.fixedCostAfterTau,"fixedCostAfterTau");
@@ -67,6 +68,36 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
     }
     Work::Work(const PreparedStage& p,const StartSpec& k,const RmpDuals& d,const Budget& b,PricingStatistics& st)
         :data(p),start(k),duals(d),budget(b),stats(st),weight(d.phase==RmpPhase::Cost?1.:0.) {
+        forcedNext.assign(data.n()+2,-1); forcedPrevious.assign(data.n()+2,-1);
+        auto rfIndex=[&](RfElement e) {
+            if(e.kind==RfElementKind::ExternalStart)return e.key==start.startKey?-1:-2;
+            const int i=data.index.at(e.key);rfMask.set(i);return i;
+        };
+        auto endpoint=[&](ArcEndpoint e) {
+            return e.kind==ArcEndpointKind::Source?0:e.kind==ArcEndpointKind::Return?data.n()+1:data.index.at(e.customerId);
+        };
+        auto force=[](int& slot,int value) { if(slot==-1)slot=value;else if(slot!=value)slot=-2; };
+        for(const auto& decision:data.context.decisions) {
+            budget.check();
+            if(const auto* rf=std::get_if<RfDecision>(&decision)) {
+                rfRules.push_back({rfIndex(rf->first),rfIndex(rf->second),rf->together});
+                continue;
+            }
+            const auto& rule=std::get<ArcDecision>(decision);
+            const int from=endpoint(rule.arc.from),to=endpoint(rule.arc.to);
+            const bool own=rule.arc.startKey==start.startKey;
+            if(!rule.use) { if(own)forbiddenArcs.emplace_back(from,to);continue; }
+            if(!own) {
+                if(from>0 && from<=data.n())bannedCustomers.set(from);
+                if(to>0 && to<=data.n())bannedCustomers.set(to);
+            } else if(from==0 && to==data.n()+1) {
+                for(int j=1;j<=data.n();++j)bannedCustomers.set(j);
+            } else {
+                // Source may launch OTHER routes too; only force customer endpoints.
+                if(from>0)force(forcedNext[from],to);
+                if(to<=data.n())force(forcedPrevious[to],from);
+            }
+        }
         sourceDistances.resize(data.n()+2);
         for(int j=1;j<=data.n();++j) {
             budget.check();
@@ -80,10 +111,27 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
     double Work::arc(int from,int to) const {
         return from==0?sourceDistances.at(to):data.distances.at(from).at(to);
     }
+    bool Work::rfAllowed(const routeOptLong& visited,bool finishing) const {
+        auto seen=[&](int i){return i==-1 || (i>=0 && visited.test(i));};
+        for(const auto& r:rfRules) {
+            const bool a=seen(r.first),b=seen(r.second);
+            if(r.together ? finishing && a!=b : a&&b)return false;
+        }
+        return true;
+    }
+    bool Work::arcAllowed(int from,int to) const {
+        if(to<=data.n() && bannedCustomers.test(to))return false;
+        if(forcedNext[from]!=-1 && forcedNext[from]!=to)return false;
+        if(forcedPrevious[to]!=-1 && forcedPrevious[to]!=from)return false;
+        return std::find(forbiddenArcs.begin(),forbiddenArcs.end(),std::pair{from,to})==forbiddenArcs.end();
+    }
     std::optional<Label> Work::extend(std::size_t parent,int j) {
         budget.check();
         const auto& previous=labels.at(parent);
         if(previous.visited.test(j))return {};
+        if(!arcAllowed(previous.vertex,j))return {};
+        auto visited=previous.visited;visited.set(j);
+        if(!rfAllowed(visited,false))return {};
         const auto& c=data.stage.customers.at(j-1);
         const double length=arc(previous.vertex,j);
         const double load=checked(previous.load+c.demand);
@@ -94,14 +142,14 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
         Label next;next.vertex=j;next.time=time;next.load=load;
         next.cost=checked(previous.cost+length);
         next.rc=checked(checked(previous.rc+weight*length)-duals.customers.at(c.id));
-        next.visited=previous.visited;next.visited.set(j);next.predecessor=parent;
+        next.visited=visited;next.predecessor=parent;
         return next;
     }
     bool Work::dominates(const Label& a,const Label& b) {
         budget.check();++stats.dominanceChecks;
         // Conservative comparison: never discard a slightly better label via epsilon.
         return a.vertex==b.vertex && a.time<=b.time && a.load<=b.load && a.rc<=b.rc
-            && (a.visited & ~b.visited).none();
+            && (a.visited & ~b.visited).none() && (a.visited & rfMask)==(b.visited & rfMask);
     }
     std::size_t Work::retain(Label l) {
         budget.check();
@@ -123,6 +171,7 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
         budget.check();
         const auto& l=labels.at(id);
         if(l.vertex==0 && start.kind==StartKind::Origin)return;
+        if(!rfAllowed(l.visited,true) || !arcAllowed(l.vertex,data.n()+1))return;
         const double length=arc(l.vertex,data.n()+1);
         if(checked(l.time+length)>data.stage.returnDepot.deadline+TOLERANCE)return;
         const double rc=checked(l.rc+weight*length),cost=checked(l.cost+length);
@@ -137,6 +186,7 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
             witness.route.customerSequence.push_back(data.stage.customers.at(labels[id].vertex-1).id);
         }
         std::reverse(witness.route.customerSequence.begin(),witness.route.customerSequence.end());
+        require(routeAllowed(witness.route,data.context),"recovered route violates branches");
         // Re-evaluate the recovered route; do not expose an unchecked predecessor chain.
         std::set<int> seen;double time=start.startTime,load=0,cost=0,dualSum=0;
         Location previous=start.location;
@@ -164,12 +214,18 @@ namespace RouteOpt::Application::DVRP::PricingDetail {
 
 namespace RouteOpt::Application::DVRP {
     using namespace PricingDetail;
-    struct DVRP_PricingController::Impl { PreparedStage data;explicit Impl(const StageProblem& s):data(s){} };
-    DVRP_PricingController::DVRP_PricingController(const StageProblem& s):impl_(std::make_unique<Impl>(s)){}
+    struct DVRP_PricingController::Impl {
+        PreparedStage data;
+        Impl(const StageProblem& s,const BranchContext& c):data(s,c){}
+    };
+    DVRP_PricingController::DVRP_PricingController(const StageProblem& s):DVRP_PricingController(s,BranchContext{}){}
+    DVRP_PricingController::DVRP_PricingController(const StageProblem& s,const BranchContext& c)
+        :impl_(std::make_unique<Impl>(s,c)){}
     DVRP_PricingController::~DVRP_PricingController()=default;
     PricingResult DVRP_PricingController::price(const RmpDuals& d,const PricingOptions& o) const {
         const auto began=Clock::now();
         PricingResult r;r.stageId=impl_->data.stage.stageId;r.modelRevision=d.modelRevision;r.phase=d.phase;r.backend=o.backend;
+        r.context=impl_->data.context;
         try {
             auto require=[](bool ok,const char* why){if(!ok)throw std::invalid_argument(why);};
             require(o.backend==PricingBackend::PlainLabeling || o.backend==PricingBackend::BucketGraph,"unknown pricing backend");
@@ -178,6 +234,7 @@ namespace RouteOpt::Application::DVRP {
             require(d.phase==RmpPhase::Feasibility || d.phase==RmpPhase::Cost,"invalid RMP phase");
             const auto& data=impl_->data;const auto& s=data.stage;
             require(d.stageId==s.stageId,"dual stage mismatch");
+            require(d.context==data.context,"dual node/branch context mismatch");
             require(d.customers.size()==s.customers.size() && d.externalStarts.size()==s.externalStarts.size(),"dual key count mismatch");
             for(const auto& c:s.customers)require(d.customers.contains(c.id)&&std::isfinite(d.customers.at(c.id)),"missing/nonfinite customer dual");
             for(const auto& k:s.externalStarts)require(d.externalStarts.contains(k.startKey)&&std::isfinite(d.externalStarts.at(k.startKey)),"missing/nonfinite external dual");

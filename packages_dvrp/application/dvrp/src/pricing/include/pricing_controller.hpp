@@ -44,10 +44,12 @@ namespace RouteOpt::Application::DVRP {
         PricingStatistics statistics;
         double seconds{};
         std::string message;
+        BranchContext context;
     };
     class DVRP_PricingController {
     public:
         explicit DVRP_PricingController(const StageProblem& stage); // Invalid stage throws.
+        DVRP_PricingController(const StageProblem& stage, const BranchContext& context);
         ~DVRP_PricingController();
         DVRP_PricingController(const DVRP_PricingController&) = delete;
         DVRP_PricingController& operator=(const DVRP_PricingController&) = delete;

@@ -26,6 +26,7 @@ namespace RouteOpt::Application::DVRP {
         double rcRoundingGuard{}, sumRoundingGuard{};
         double lowerBound{}, rmpObjective{}, gap{};
         std::optional<double> totalLowerBound, totalRmpObjective; // Cost phase only.
+        BranchContext context;
     };
     struct RootCgSnapshot {
         RmpLpResult lp;
@@ -43,6 +44,7 @@ namespace RouteOpt::Application::DVRP {
         std::optional<RootCgBound> bound;
         double lpTimeLimit{}, pricingTimeLimit{}, lpSeconds{}, pricingSeconds{}, elapsedSeconds{};
         std::string action;
+        std::size_t nodeId{};
     };
     struct RootCgResult {
         std::size_t stageId{};
@@ -52,10 +54,12 @@ namespace RouteOpt::Application::DVRP {
         std::vector<RootCgIteration> iterations;
         double seconds{};
         std::string message;
+        BranchContext context;
     };
     class DVRP_RootCgController {
     public:
         RootCgResult solve(const StageProblem& stage, const RootCgOptions& options) const;
+        RootCgResult solve(const StageProblem& stage, const BranchContext& context, const RootCgOptions& options) const;
     };
 }
 #endif
