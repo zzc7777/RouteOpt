@@ -1,6 +1,6 @@
 # DVRP 已实现模块索引
 
-> 状态：已确认；最后更新：2026-10-25。
+> 状态：已确认；最后更新：2026-10-26。
 
 本目录记录已经落地并完成验证的 DVRP 模块和测试工具，明确区分生产入口与测试入口。
 
@@ -23,8 +23,9 @@
 | 定价MIP独立对照 | 已实现独立单路径MIP、逐起点最小rc及测试CG审核；不属于生产求解器 | `packages_dvrp/application/dvrp/test/pricing/mip_reference` | [说明与方法导读](DVRP定价MIP独立对照测试.md) |
 | 根节点列生成 | 已实现两阶段RMP/pricing正式循环、数值界及总预算 | `packages_dvrp/application/dvrp/src/column_generation` | [模块说明](DVRP根节点列生成模块.md)、[流程与方法导读](DVRP根节点列生成流程与方法导读.md) |
 | 双策略分支与受限列生成 | 已实现RF/起点专属有向弧候选、限制及受限节点LP，两版pricing均支持 | `packages_dvrp/application/dvrp/src/branching`及既有RMP/pricing/CG | [模块说明](DVRP双策略分支与受限列生成模块.md)、[流程与方法导读](DVRP双策略分支流程与方法导读.md) |
+| 共同BP搜索树与整数恢复 | 已实现单阶段BP、四种组合、整数校验、全局界和停止状态 | `packages_dvrp/branching/bbt`及应用`src/branch_and_price` | [模块说明](DVRP共同BP搜索树与整数恢复模块.md)、[流程与方法导读](DVRP共同BP搜索树与整数恢复流程与方法导读.md) |
 
-共同BP搜索树、生产整数恢复和后续增强策略尚未实现。根/子节点CG返回LP，不代表 `dvrp.exe` 已能自动优化并执行整数路线。
+单阶段BP现可返回经校验的整数路线并显式转换为StageSolution；动态自动求解循环、CLI接线和后续增强尚未实现。`dvrp.exe`仍只读取数据，不自动派车。
 
 ## 怎样阅读
 

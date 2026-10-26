@@ -16,6 +16,11 @@ option(DVRP_BUILD_PRICING_TESTS "Build plain/bucket pricing tests (solver option
 option(DVRP_BUILD_ROOT_CG_TESTS "Build production root column-generation tests (CPLEX)" OFF)
 option(DVRP_BUILD_BRANCHING_TESTS "Build branching/pricing semantic tests (no solver)" OFF)
 option(DVRP_BUILD_BRANCHING_CG_TESTS "Build constrained node CG tests (CPLEX)" OFF)
+option(DVRP_BUILD_BP_TESTS "Build BP tree and integer recovery tests (no solver)" OFF)
+option(DVRP_BUILD_BP_SOLVER_TESTS "Build complete stage BP tests (CPLEX)" OFF)
+
+set(DVRP_BP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/branch_and_price")
+set(DVRP_BBT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../branching/bbt/include")
 
 set(DVRP_BRANCHING_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/branching/src/branching.cpp")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/branching/include")
@@ -151,7 +156,24 @@ if (DVRP_BUILD_BRANCHING_TESTS)
     endforeach ()
 endif ()
 
-if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TESTS OR DVRP_BUILD_BRANCHING_CG_TESTS)
+if (DVRP_BUILD_BP_TESTS)
+    if (NOT BUILD_TESTING)
+        message(FATAL_ERROR "DVRP BP tests require BUILD_TESTING=ON")
+    endif ()
+    add_executable(dvrp_bp_tree_test test/branch_and_price/bp_tree_test.cpp
+        ${DVRP_BP_DIR}/src/integer_recovery.cpp ${DVRP_BRANCHING_SOURCE} ${DVRP_DYNAMIC_SOURCE})
+    target_include_directories(dvrp_bp_tree_test PRIVATE ${DVRP_BP_DIR}/include ${DVRP_BBT_INCLUDE_DIR}
+        src/column_generation/include src/node/include ${DVRP_PRICING_DIR}/include
+        ${DVRP_DYNAMIC_INCLUDE_DIR} ${ROUTEOPT_CONFIG_INCLUDE_DIR})
+    if (MSVC)
+        target_compile_options(dvrp_bp_tree_test PRIVATE /utf-8)
+    endif ()
+    foreach (case tree rf arc validation stale status empty numeric atomic)
+        add_test(NAME dvrp_bp_tree_${case} COMMAND dvrp_bp_tree_test ${case})
+    endforeach ()
+endif ()
+
+if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TESTS OR DVRP_BUILD_BRANCHING_CG_TESTS OR DVRP_BUILD_BP_SOLVER_TESTS)
     if (NOT BUILD_TESTING)
         message(FATAL_ERROR "DVRP solver tests require BUILD_TESTING=ON")
     endif ()
@@ -196,6 +218,25 @@ if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TE
                 VERBATIM)
         endif ()
     endfunction()
+    if (DVRP_BUILD_BP_SOLVER_TESTS)
+        add_executable(dvrp_bp_solver_test test/branch_and_price/bp_solver_test.cpp
+            ${DVRP_READER_SOURCE}
+            ${DVRP_BP_DIR}/src/bp_controller.cpp ${DVRP_BP_DIR}/src/integer_recovery.cpp
+            src/column_generation/src/root_cg_controller.cpp src/node/src/rmp_controller.cpp
+            ${DVRP_PRICING_SOURCES} ${DVRP_DYNAMIC_SOURCE}
+            ${DVRP_REFERENCE_DIR}/stage_route_enumerator.cpp ${DVRP_REFERENCE_DIR}/stage_reference_solver.cpp
+            ${DVRP_SOLVER_DIR}/src/solver_cplex.cpp)
+        target_include_directories(dvrp_bp_solver_test PRIVATE ${DVRP_BP_DIR}/include ${DVRP_BBT_INCLUDE_DIR}
+            src/column_generation/include src/node/include ${DVRP_PRICING_DIR}/include ${DVRP_INCLUDE_DIR})
+        configure_dvrp_solver_test(dvrp_bp_solver_test)
+        foreach (case fractional external empty infeasible random limits lifecycle invalid deep size)
+            add_test(NAME dvrp_bp_solver_${case} COMMAND dvrp_bp_solver_test ${case})
+            set_tests_properties(dvrp_bp_solver_${case} PROPERTIES TIMEOUT 300)
+        endforeach ()
+        add_test(NAME dvrp_bp_solver_instance COMMAND dvrp_bp_solver_test instance
+            "${CMAKE_CURRENT_SOURCE_DIR}/instance/c101_D_25_E_25.txt")
+        set_tests_properties(dvrp_bp_solver_instance PROPERTIES TIMEOUT 40)
+    endif ()
     if (DVRP_BUILD_BRANCHING_CG_TESTS)
         add_executable(dvrp_branching_cg_test test/branching/branching_cg_test.cpp
             src/column_generation/src/root_cg_controller.cpp src/node/src/rmp_controller.cpp

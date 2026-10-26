@@ -239,6 +239,7 @@ namespace RouteOpt::Application::DVRP {
                 log.pricingTimeLimit=po.timeLimitSeconds;
                 const auto p=pricing.price(*lp.duals,po);
                 log.pricingStatus=p.status; log.pricingSeconds=p.seconds;
+                log.pricingStatistics=p.statistics;
                 remaining();
                 if (const auto stop=RootCgDetail::classifyPricingStatus(p.status)) throw Stop{*stop,p.message};
                 RootCgDetail::validatePricingResult(s,lp,p,o.pricing.backend);

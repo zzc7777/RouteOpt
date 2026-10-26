@@ -45,6 +45,7 @@ namespace RouteOpt::Application::DVRP {
         double lpTimeLimit{}, pricingTimeLimit{}, lpSeconds{}, pricingSeconds{}, elapsedSeconds{};
         std::string action;
         std::size_t nodeId{};
+        std::optional<PricingStatistics> pricingStatistics; // Empty when pricing was not called.
     };
     struct RootCgResult {
         std::size_t stageId{};
