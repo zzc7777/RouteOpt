@@ -18,6 +18,8 @@ option(DVRP_BUILD_BRANCHING_TESTS "Build branching/pricing semantic tests (no so
 option(DVRP_BUILD_BRANCHING_CG_TESTS "Build constrained node CG tests (CPLEX)" OFF)
 option(DVRP_BUILD_BP_TESTS "Build BP tree and integer recovery tests (no solver)" OFF)
 option(DVRP_BUILD_BP_SOLVER_TESTS "Build complete stage BP tests (CPLEX)" OFF)
+option(DVRP_BUILD_SOLVER "Build the independent dynamic BP solving CLI (CPLEX)" OFF)
+option(DVRP_BUILD_SIMULATION_TESTS "Build dynamic BP integration and CLI tests (CPLEX)" OFF)
 
 set(DVRP_BP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/branch_and_price")
 set(DVRP_BBT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../branching/bbt/include")
@@ -173,14 +175,16 @@ if (DVRP_BUILD_BP_TESTS)
     endforeach ()
 endif ()
 
-if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TESTS OR DVRP_BUILD_BRANCHING_CG_TESTS OR DVRP_BUILD_BP_SOLVER_TESTS)
+if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TESTS OR DVRP_BUILD_BRANCHING_CG_TESTS OR DVRP_BUILD_BP_SOLVER_TESTS OR DVRP_BUILD_SIMULATION_TESTS)
     if (NOT BUILD_TESTING)
         message(FATAL_ERROR "DVRP solver tests require BUILD_TESTING=ON")
     endif ()
+endif ()
+if (DVRP_BUILD_SOLVER OR DVRP_BUILD_SIMULATION_TESTS OR DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TESTS OR DVRP_BUILD_BRANCHING_CG_TESTS OR DVRP_BUILD_BP_SOLVER_TESTS)
     set(ROUTEOPT_SOLVER "CPLEX" CACHE STRING "DVRP solver backend (currently CPLEX only)")
     string(TOUPPER "${ROUTEOPT_SOLVER}" ROUTEOPT_SOLVER)
     if (NOT ROUTEOPT_SOLVER STREQUAL "CPLEX")
-        message(FATAL_ERROR "DVRP solver tests currently support ROUTEOPT_SOLVER=CPLEX only")
+        message(FATAL_ERROR "DVRP solver targets currently support ROUTEOPT_SOLVER=CPLEX only")
     endif ()
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../external/cmake_modules")
     find_package(CPLEX REQUIRED)
@@ -200,9 +204,9 @@ if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TE
             message(FATAL_ERROR "Matching CPLEX DLL not found; set DVRP_CPLEX_RUNTIME explicitly")
         endif ()
     endif ()
-    function(configure_dvrp_solver_test target)
+    function(configure_dvrp_solver_target target)
         target_include_directories(${target} PRIVATE
-            ${DVRP_REFERENCE_DIR} ${DVRP_DYNAMIC_INCLUDE_DIR} ${ROUTEOPT_CONFIG_INCLUDE_DIR}
+            ${DVRP_DYNAMIC_INCLUDE_DIR} ${ROUTEOPT_CONFIG_INCLUDE_DIR}
             ${DVRP_SOLVER_DIR}/include ${CPLEX_INCLUDE_DIRS})
         target_compile_definitions(${target} PRIVATE SOLVER_TYPE=1)
         target_link_libraries(${target} PRIVATE ${CPLEX_LIBRARIES})
@@ -218,6 +222,41 @@ if (DVRP_BUILD_REFERENCE_SOLVER OR DVRP_BUILD_RMP_TESTS OR DVRP_BUILD_ROOT_CG_TE
                 VERBATIM)
         endif ()
     endfunction()
+    function(configure_dvrp_solver_test target)
+        configure_dvrp_solver_target(${target})
+        target_include_directories(${target} PRIVATE ${DVRP_REFERENCE_DIR})
+    endfunction()
+    if (DVRP_BUILD_SOLVER OR DVRP_BUILD_SIMULATION_TESTS)
+        set(DVRP_SIMULATION_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/simulation")
+        set(DVRP_SIMULATION_SOURCES
+            ${DVRP_SIMULATION_DIR}/src/simulation_controller.cpp
+            ${DVRP_BP_DIR}/src/bp_controller.cpp ${DVRP_BP_DIR}/src/integer_recovery.cpp
+            src/column_generation/src/root_cg_controller.cpp src/node/src/rmp_controller.cpp
+            ${DVRP_PRICING_SOURCES} ${DVRP_DYNAMIC_SOURCE} ${DVRP_SOLVER_DIR}/src/solver_cplex.cpp)
+        set(DVRP_SIMULATION_INCLUDES ${DVRP_SIMULATION_DIR}/include ${DVRP_BP_DIR}/include
+            ${DVRP_BBT_INCLUDE_DIR} src/column_generation/include src/node/include ${DVRP_PRICING_DIR}/include)
+        add_executable(dvrp_solve src/solve_main.cpp ${DVRP_READER_SOURCE} ${DVRP_SIMULATION_SOURCES})
+        target_include_directories(dvrp_solve PRIVATE ${DVRP_SIMULATION_INCLUDES} ${DVRP_INCLUDE_DIR})
+        configure_dvrp_solver_target(dvrp_solve)
+        if (DVRP_BUILD_SIMULATION_TESTS)
+            add_executable(dvrp_simulation_test test/simulation/simulation_test.cpp ${DVRP_SIMULATION_SOURCES}
+                ${DVRP_REFERENCE_DIR}/stage_route_enumerator.cpp ${DVRP_REFERENCE_DIR}/stage_reference_solver.cpp)
+            target_include_directories(dvrp_simulation_test PRIVATE ${DVRP_SIMULATION_INCLUDES})
+            configure_dvrp_solver_test(dvrp_simulation_test)
+            foreach (case events empty completion waiting returning external infeasible stops malformed io budgets oracle lifecycle size fractional deep_stop)
+                add_test(NAME dvrp_simulation_${case} COMMAND dvrp_simulation_test ${case})
+                set_tests_properties(dvrp_simulation_${case} PROPERTIES TIMEOUT 300)
+            endforeach ()
+            foreach (case success help arguments input infeasible limits)
+                add_test(NAME dvrp_solve_cli_${case} COMMAND ${CMAKE_COMMAND}
+                    "-DPROGRAM=$<TARGET_FILE:dvrp_solve>" "-DCASE=${case}"
+                    "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}/test/simulation/fixtures"
+                    "-DREADER_FIXTURES=${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures"
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/test/simulation/check_cli.cmake")
+                set_tests_properties(dvrp_solve_cli_${case} PROPERTIES TIMEOUT 120)
+            endforeach ()
+        endif ()
+    endif ()
     if (DVRP_BUILD_BP_SOLVER_TESTS)
         add_executable(dvrp_bp_solver_test test/branch_and_price/bp_solver_test.cpp
             ${DVRP_READER_SOURCE}

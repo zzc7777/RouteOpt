@@ -2,7 +2,7 @@
 
 > 状态：已完成（动态模块；不包含阶段 BP）。
 >
-> 最后更新：2026-10-25（更新下游根CG入口；动态代码及原验证记录不变）。
+> 最后更新：2026-10-26（更新动态BP调用方；动态代码及原验证记录不变）。
 >
 > 语义依据：[数学模型 v4](../模型和推导/DVRP%20数学模型-v4.md)。
 
@@ -10,9 +10,9 @@
 
 ## 1. 当前能做什么
 
-接收 reader 的八字段数据，生成动态事件和 `StageProblem`；接收手工、已实现的小实例对照或未来BP给出的整数路线，校验后推进车辆，累计实际距离，直到下一事件或全部返场。
+接收 reader 的八字段数据，生成动态事件和 `StageProblem`；通过 `StageSolution` 接收整数路线，校验后推进车辆、累计实际距离，直到下一事件或全部返场。除手工路线及小实例MIP测试外，现已由独立的[动态BP控制器](DVRP动态BP闭环与命令行模块.md)自动串联阶段求解和事件推进；本模块自身不调用BP。
 
-`dvrp.exe` 的 CLI 仍只读取实例。动态模块已编入该目标，但尚未在 `main.cpp` 接入自动求解；目前通过 `dvrp_dynamic_test` 独立运行。不能据此声称已经完成 DVRP 的 BP 求解。
+`dvrp.exe` 和 `main.cpp` 仍只读取实例；新增的可选 `dvrp_solve.exe` 才是完整动态求解入口。`dvrp_dynamic_test` 继续用手工路线独立测试本模块，不依赖solver。
 
 ## 2. 文件职责
 
@@ -34,14 +34,14 @@
 reader 的 info_vertex、capacity、instanceName
   -> DynamicController（复制输入，拥有实际状态和执行计划）
   -> StageProblem（当前客户、各起点、独立返回车场、固定成本）
-  -> 手工路线 / 小实例MIP对照 / 未来阶段BP
+  -> 单阶段BP（由SimulationController调用；测试也可提供手工/MIP路线）
   -> StageSolution（阶段编号、状态、每条路线的起点和客户顺序）
   -> 校验并接续执行 -> 下一事件
 ```
 
 阶段快照只包含当前待规划客户，不暴露未来客户。客户保持原输入 ID；`startKey=0` 表示不限车辆的原始起点，正数表示稳定的物理车辆 ID，两者不是 pricing 数组编号。返回车场是独立字段。
 
-`state()`、`buildStageProblem()`、`records()` 均返回值副本；下一阶段不修改调用方保存的旧快照。下游如何转成连续数组、根 RMP 或 bucket graph，仍须单独适配。
+`state()`、`buildStageProblem()`、`records()` 均返回值副本；下一阶段不修改调用方保存的旧快照。连续编号、RMP与bucket graph转换由各求解模块内部完成，不在动态层处理；自动循环由独立SimulationController组织。
 
 ## 4. 固定调用顺序
 
@@ -86,7 +86,7 @@ reader 的 info_vertex、capacity、instanceName
 
 `Infeasible`、两种 `TimeLimit` 和 `Error` 都停止仿真；超时即使有可行路线也不执行，不沿用旧计划、不报告成功。`records()` 保存当时阶段、收到的状态/路线和原因；失败记录的成本未验证，以 `executed=false` 区分。
 
-记录目前保存在内存，调用方可取值；没有磁盘恢复或自动 JSON 导出。动态模块本身不管理 solver 计时；已完成的可选对照工具负责向CPLEX传时限，生产BP的时限联动仍待接入。
+记录保存在内存，调用方可取值；没有磁盘恢复或自动 JSON 导出。动态模块本身不管理solver计时。生产BP控制阶段预算，SimulationController据返回状态停止；其CLI输出可重定向的结构化文本。该生产调用方只接受Optimal，虽然本模块的通用接口也允许经过校验的Feasible路线。
 
 ## 8. 构建与测试
 
@@ -126,4 +126,4 @@ Java 旧实现的途中改道、返场复用、仅累计完整弧距离与 v4 �
 
 ## 9. 下游边界
 
-[小实例集合划分对照求解器](DVRP小实例集合划分对照求解器.md)通过相同 `StageProblem` / `StageSolution` 接口在测试中自动连跑MIP阶段，并由本模块重验路线。多起点RMP、双版本pricing及[根CG](DVRP根节点列生成模块.md)现已实现，但根CG只输出LP，不是可交给 `acceptSolution()` 的整数方案。尚无分支和阶段BP，动态生产代码没有因此修改；当前 `dvrp.exe` 仍不提供自动求解CLI，也未做大实例性能优化。
+[小实例集合划分对照求解器](DVRP小实例集合划分对照求解器.md)通过相同接口在测试中自动连跑MIP阶段。[共同BP树](DVRP共同BP搜索树与整数恢复模块.md)支持双策略/双定价单阶段整数求解与显式结果转换；[根CG](DVRP根节点列生成模块.md)本身仍只输出LP。生产接线现已由[动态BP闭环与命令行模块](DVRP动态BP闭环与命令行模块.md)完成，调用方法见其[导读](DVRP动态BP闭环流程与方法导读.md)及[设计07](../设计/M1-标准BP-DVRP/07-动态BP闭环与命令行文件与接口.md)。本动态状态机源码及旧reader入口保持不变。
